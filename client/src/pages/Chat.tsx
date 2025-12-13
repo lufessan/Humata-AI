@@ -52,7 +52,7 @@ const getPersonaInfo = (persona: string | null) => {
   const personas: Record<string, any> = {
     chat: {
       title: "الدردشة",
-      description: "محادثة ذكية متقدمة مع Gemini 2.5 Pro",
+      description: "محادثة ذكية متقدمة",
       systemPrompt: `أنت مساعد ذكاء اصطناعي متقدم. قدم إجابات مفيدة وصحيحة ومدروسة على استفسارات المستخدمين. الرد بصيغة عربية سليمة.`,
       controlIcons: ["upload"],
     },

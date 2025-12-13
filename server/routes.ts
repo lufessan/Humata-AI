@@ -434,7 +434,7 @@ export async function registerRoutes(
         errorMessage = "تم تجاوز حد الطلبات المسموح. يرجى المحاولة لاحقاً.";
         statusCode = 429;
       } 
-      // Check for other Gemini API errors
+      // Check for other API errors
       else if (error.message?.includes("ApiError")) {
         errorMessage = "خطأ في الخدمة. يرجى المحاولة مرة أخرى.";
       }
