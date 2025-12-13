@@ -85,7 +85,9 @@ async function initializeDatabase() {
     const { Pool } = await import("pg");
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL?.includes("ssl") ? { rejectUnauthorized: false } : false,
+      ssl: process.env.NODE_ENV === 'production' || process.env.DATABASE_URL?.includes('supabase') 
+        ? { rejectUnauthorized: false } 
+        : false,
     });
 
     console.log("[Database] Initializing schema...");
@@ -108,10 +110,16 @@ async function initializeDatabase() {
         id VARCHAR PRIMARY KEY,
         user_id VARCHAR,
         title VARCHAR NOT NULL,
+        persona VARCHAR DEFAULT 'chat',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         share_token VARCHAR
       )
+    `);
+    
+    // Add persona column if it doesn't exist (for existing tables)
+    await pool.query(`
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS persona VARCHAR DEFAULT 'chat'
     `);
     console.log("[Database] Conversations table ready");
 
