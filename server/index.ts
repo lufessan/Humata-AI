@@ -88,6 +88,13 @@ async function initializeDatabase() {
       ssl: process.env.NODE_ENV === 'production' || process.env.DATABASE_URL?.includes('supabase') 
         ? { rejectUnauthorized: false } 
         : false,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
+
+    pool.on('error', (err) => {
+      console.error('[Database Pool] Unexpected error on idle client', err);
     });
 
     console.log("[Database] Initializing schema...");
