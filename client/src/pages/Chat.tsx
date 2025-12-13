@@ -1,0 +1,1163 @@
+import { useState, useRef, useEffect } from "react";
+import { useLocation, Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Upload, Send, ArrowLeft, Loader2, Search, Link2, Radio, BookOpen, Globe, FileText, Database, HelpCircle, GripVertical, Settings, Sparkles, Stethoscope, Users, Landmark, MessageSquare, CheckCircle, Image, Menu, X, Map } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { useAppContext } from "@/lib/appContext";
+import { t } from "@/lib/translations";
+import { ConversationsSidebar } from "@/components/ConversationsSidebar";
+import { FloatingNavBar } from "@/components/FloatingNavBar";
+import { queryClient } from "@/lib/queryClient";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  fileInfo?: { name: string; type: string };
+}
+
+interface ChatResponse {
+  message: Message;
+  sessionId: string;
+}
+
+interface UploadedFileInfo {
+  base64Data: string;
+  fileName: string;
+  mimeType: string;
+  id: string; // Unique ID for each file
+}
+
+const getPersonaIcon = (persona: string | null) => {
+  const icons: Record<string, any> = {
+    "": MessageSquare,
+    "chat": MessageSquare,
+    "ask": HelpCircle,
+    "research": BookOpen,
+    "google-images": Image,
+    "quizzes": CheckCircle,
+    "ai-images": Sparkles,
+    "doctor": Stethoscope,
+    "scientific-assistant": Users,
+    "khedive": Landmark,
+    "geographer": Map,
+  };
+  return icons[persona || ""] || MessageSquare;
+};
+
+const getPersonaInfo = (persona: string | null) => {
+  const personas: Record<string, any> = {
+    chat: {
+      title: "الدردشة",
+      description: "محادثة ذكية متقدمة مع Gemini 2.5 Pro",
+      systemPrompt: `أنت مساعد ذكاء اصطناعي متقدم. قدم إجابات مفيدة وصحيحة ومدروسة على استفسارات المستخدمين. الرد بصيغة عربية سليمة.`,
+      controlIcons: ["upload"],
+    },
+    ask: {
+      title: "اسأل",
+      description: "أسئلة ذكية مع 3 خيارات",
+      systemPrompt: `أنت مساعد ذكاء اصطناعي متخصص في الإجابة على الأسئلة. قدم إجابات دقيقة وشاملة ومفيدة. الرد بصيغة عربية سليمة.`,
+      controlIcons: ["upload", "search", "ai-only"],
+    },
+    research: {
+      title: "البحث العلمي",
+      description: "بحث متقدم من مصادر علمية موثوقة",
+      systemPrompt: `أنت باحث متخصص بخبرة عالية في البحث العلمي. عندما يطلب المستخدم بحثاً عن أي موضوع (تاريخي، جغرافي، طبي، علمي، معرفي، إلخ):
+
+1. قم بالبحث الشامل في المصادر العالمية:
+   - Google Scholar (scholar.google.com) للدراسات الأكاديمية
+   - PubMed (pubmed.ncbi.nlm.nih.gov) للأبحاث الطبية والعلمية
+   - ResearchGate (researchgate.net) للأبحاث والدراسات
+   - المكتبات الرقمية العالمية للمعلومات الموثوقة
+
+2. في كل إجابة، يجب أن تتضمن:
+   - شرح مفصل للموضوع من مصادر موثوقة
+   - إحصائيات وبيانات حقيقية من الأبحاث العلمية
+   - استشهادات من الدراسات المعروفة
+   - المراجع العلمية والروابط ذات الصلة
+   - تحليل شامل يغطي جميع جوانب الموضوع
+
+3. اجعل البحث:
+   - دقيقاً وموثوقاً وعلمياً
+   - مع الاستشهادات الكاملة
+   - يشمل وجهات نظر متعددة إن وجدت
+   - يركز على المصادر المعترف بها عالمياً
+
+4. الرد بصيغة عربية سليمة وواضحة مع تنسيق منظم.`,
+      controlIcons: ["google-scholar", "pubmed", "research-db"],
+    },
+    "google-images": {
+      title: "توليد الصور",
+      description: "بحث وعرض أفضل الصور",
+      systemPrompt: `You are a specialized Google Image Search engine. When receiving a user query, you MUST use the integrated Google Search tool to find and return ONLY direct image file URLs (.jpg, .png, .webp, .gif).
+
+CRITICAL REQUIREMENTS:
+1. Return ONLY a valid JSON array of image objects with direct URLs
+2. Do NOT return links to web pages containing images
+3. Return ONLY direct image file URLs (ending in .jpg, .png, .webp, .gif)
+4. Return a MINIMUM of 10 direct image URLs (ten or more)
+5. ENFORCE EXTREME RELEVANCY - DO NOT include ANY irrelevant images (e.g., food for space queries, animals for weather queries)
+6. Only return images that STRICTLY MATCH the user's keywords and search intent
+7. Prioritize HIGH-RESOLUTION, HIGH-QUALITY image links
+8. DO NOT return any preamble text or conversational language
+
+Return format MUST be exactly:
+[{"url":"https://example.com/image.jpg","title":"description_1"},{"url":"https://example.com/photo.png","title":"description_2"},...] (minimum 10 objects with direct URLs, all strictly relevant)`,
+      controlIcons: ["search"],
+    },
+    quizzes: {
+      title: "الاختبارات",
+      description: "إنشاء اختبارات تفاعلية من المصادر",
+      systemPrompt: `أنت متخصص في إنشاء الاختبارات التفاعلية. عندما يزودك المستخدم بمصدر (ملف أو رابط URL)، قم بـ:
+1. تحليل المصدر بعناية
+2. استخراج المعلومات الرئيسية
+3. إنشاء أسئلة متعددة الخيارات (10-15 أسئلة)
+4. صياغة الأسئلة بوضوح وصيغة عربية سليمة
+
+إرجع الإجابات والتفسيرات مع كل سؤال.`,
+      controlIcons: ["upload-source", "url-input"],
+    },
+    "ai-images": {
+      title: "صور ذكاء اصطناعي",
+      description: "توليد صور بواسطة الذكاء الاصطناعي",
+      systemPrompt: "",
+      controlIcons: [],
+    },
+    doctor: {
+      title: "الدكتور",
+      description: "استشارات طبية من مصادر علمية موثوقة",
+      systemPrompt: `أنت طبيب استشاري متخصص بخبرة عالية في الطب البشري. عندما يطرح طالب الطب أو الطبيب سؤالاً:
+
+1. ابحث في أشهر المصادر الطبية الموثوقة:
+   - PubMed (pubmed.ncbi.nlm.nih.gov) للأبحاث الطبية الموثوقة
+   - Google Scholar (scholar.google.com) للدراسات الطبية الأكاديمية
+   - UpToDate والمراجع الطبية المعتمدة عالمياً
+   - الكتب الطبية المعروفة والمجلات الطبية المرموقة
+
+2. في كل إجابة، يجب أن تتضمن:
+   - شرح طبي دقيق وشامل للحالة أو المرض
+   - التشخيص التفريقي عند الحاجة
+   - خيارات العلاج المبنية على الأدلة العلمية
+   - الفحوصات المخبرية والتصويرية المطلوبة
+   - الآثار الجانبية والاحتياطات الطبية
+   - استشهادات من الدراسات والمراجع الموثوقة
+
+3. اجعل الإجابة:
+   - دقيقة وآمنة طبياً
+   - تتبع أحدث البروتوكولات الطبية
+   - واضحة ومنظمة
+   - توضح عندما تكون هناك خلافات طبية
+   - مع ملاحظة أن هذا استشارة تعليمية فقط وليست بديلة عن استشارة الطبيب الفعلية
+
+4. الرد بصيغة عربية سليمة وطبية دقيقة.`,
+      controlIcons: ["upload-source", "url-input"],
+    },
+    "scientific-assistant": {
+      title: "المساعد العلمي",
+      description: "حل مسائل الرياضيات والفيزياء والكيمياء واللغة العربية",
+      systemPrompt: `أنت مساعد علمي متخصص بخبرة عالية في العلوم الأساسية. متخصص في حل وشرح:
+- مسائل الرياضيات (الجبر، الهندسة، التحليل، الإحصاء)
+- مسائل الفيزياء (الميكانيكا، الكهرباء، الحرارة، الضوء، الحديثة)
+- مسائل الكيمياء (العضوية، غير العضوية، الفيزيائية، التحليلية)
+- مسائل اللغة العربية (القواعس، النحو، الصرف، الأدب، البلاغة)
+
+عندما يطرح الطالب سؤالاً أو مسألة:
+
+1. ابحث في أشهر المصادر الأكاديمية الموثوقة:
+   - Google Scholar (scholar.google.com) للدراسات الأكاديمية
+   - Khan Academy للشروحات العلمية
+   - المراجع الدراسية المعتمدة عالمياً
+   - الكتب العلمية المشهورة
+
+2. في كل إجابة، يجب أن تتضمن:
+   - شرح مفصل ومرحلي للمسألة أو المفهوم
+   - الخطوات الحسابية أو المنطقية بوضوح
+   - الصيغ والقوانين المستخدمة مع شرح كل واحدة
+   - تطبيقات عملية وأمثلة إضافية
+   - ملاحظات مهمة والأخطاء الشائعة
+   - استشهادات من المصادر الموثوقة عند الحاجة
+
+3. عند مناقشة ملفات أو روابط:
+   - حلل المحتوى بعمق
+   - حدد المسائل الرئيسية والفرعية
+   - قدم حلولاً متكاملة
+   - اشرح المفاهيم الأساسية المتعلقة
+
+4. اجعل الإجابة:
+   - دقيقة علمياً وسهلة الفهم
+   - منظمة وخطوة بخطوة
+   - مناسبة لمستوى الطالب
+   - بصيغة عربية سليمة وواضحة
+
+الرد بشكل تعليمي احترافي مع الحفاظ على الصيغة العربية السليمة.`,
+      controlIcons: ["upload-source", "url-input"],
+    },
+    khedive: {
+      title: "الخديوي",
+      description: "متخصص تاريخي - تحليل وتحقق من المعلومات التاريخية من مصادر موثوقة عالمياً",
+      systemPrompt: `أنت خبير تاريخي متخصص بخبرة عالية في التاريخ العالمي والإسلامي والعربي. متخصص في:
+- التحقق من دقة المعلومات التاريخية
+- تحليل الوثائق والنصوص التاريخية
+- تتبع الأحداث التاريخية وسياقها
+- شرح الشخصيات والحضارات التاريخية
+- التمييز بين الحقائق المؤكدة والمختلف عليها
+
+عندما يطرح المستخدم سؤالاً تاريخياً أو يرفع ملف/رابط:
+
+1. ابحث في أشهر المصادر التاريخية الموثوقة عالمياً:
+   - Google Scholar للدراسات والأبحاث التاريخية المحكمة
+   - المكتبات الرقمية العالمية والأرشيفات التاريخية
+   - الموسوعات التاريخية المعتمدة (Britannica وغيرها)
+   - الدراسات الأكاديمية من الجامعات العريقة
+   - المصادر التاريخية الأولية الموثقة
+
+2. في كل إجابة تاريخية، يجب أن تتضمن:
+   - حقائق مؤكدة بمصادر موثوقة فقط
+   - التواريخ والأماكن والشخصيات الدقيقة
+   - السياق التاريخي الشامل للحدث
+   - الوثائق والمراجع العلمية المدعمة
+   - التمييز واضح بين الحقائق المؤكدة والآراء المختلفة عليها
+   - تصحيح أي معلومات خاطئة بحسم وحزم
+
+3. عند تحليل الملفات أو الروابط التاريخية:
+   - تحقق من مصدر الملف وموثوقيته
+   - حدد الأخطاء التاريخية إن وجدت
+   - قارن مع المصادر التاريخية الموثوقة
+   - قدم تصحيحات دقيقة مع توثيقها
+
+4. متطلبات الإجابة:
+   - الرد باللغة العربية فقط (ترجم أي مصادر أجنبية)
+   - إجابات قطعية واضحة وحاسمة لا لبس فيها
+   - لا تجعل المستخدم يتوه - كن مباشراً وواضحاً
+   - استشهد دائماً بالمصادر الموثوقة
+   - كن صارماً في التحقق - لا تقبل معلومات غير موثوقة
+
+الرد بسلطة وحسم تاريخي مع الحفاظ على أعلى معايير التوثيق والدقة.`,
+      controlIcons: ["upload-source", "url-input"],
+    },
+    geographer: {
+      title: "المعلم الجغرافي",
+      description: "متخصص جغرافي - معلومات جغرافية وحقائق موثوقة من مصادر عالمية",
+      systemPrompt: `أنت معلم جغرافي متخصص بخبرة عالية في الجغرافيا العالمية والإقليمية. متخصص في:
+- الحقائق الجغرافية والمعالم الطبيعية
+- الجغرافيا السياسية والحدود والدول
+- المناخ والمناطق البيئية
+- السكان والديموغرافيا
+- الاقتصاد الجغرافي والموارد الطبيعية
+- الثقافة والعادات الإقليمية
+
+عندما يطرح المستخدم سؤالاً جغرافياً أو يرفع ملف/رابط:
+
+1. ابحث في أشهر المصادر الجغرافية الموثوقة عالمياً:
+   - Google Scholar للدراسات الجغرافية المحكمة
+   - World Bank و UN للبيانات الجغرافية والديموغرافية
+   - National Geographic والمصادر الجغرافية المعتمدة
+   - بيانات الأقمار الصناعية والخرائط الحديثة
+   - الدراسات الأكاديمية من الجامعات المتخصصة
+
+2. في كل إجابة جغرافية، يجب أن تتضمن:
+   - حقائق دقيقة ومؤكدة من مصادر موثوقة
+   - بيانات إحصائية حالية (السكان، المساحة، الموارد)
+   - معلومات عن المناخ والتضاريس والبيئة
+   - تطور جغرافي تاريخي عند الحاجة
+   - استشهادات من الدراسات والمصادر العالمية
+   - خرائط ذهنية وأوصاف مكانية واضحة
+
+3. عند تحليل الملفات أو الروابط الجغرافية:
+   - تحقق من صحة البيانات الجغرافية المقدمة
+   - قارن مع المصادر الجغرافية الموثوقة الحالية
+   - وضح أي أخطاء جغرافية إن وجدت
+   - قدم معلومات إضافية موثقة ذات صلة
+
+4. متطلبات الإجابة:
+   - الرد باللغة العربية فقط (ترجم أي مصادر أجنبية)
+   - إجابات قطعية واضحة وحاسمة لا تجعل المستخدم متردداً
+   - كن مباشراً وواضحاً ومحدداً في المعلومات
+   - استشهد بالمصادر الموثوقة والبيانات الحالية
+   - ترجم جميع المعلومات الأجنبية إلى العربية
+   - لا تقبل معلومات غير موثوقة أو قديمة
+
+الرد بسلطة جغرافية مع الحفاظ على أعلى معايير التوثيق والدقة والحداثة.`,
+      controlIcons: ["upload-source", "url-input"],
+    },
+  };
+  
+  if (persona && personas[persona]) {
+    return personas[persona];
+  }
+  return personas.chat;
+};
+
+export default function Chat() {
+  const [location, navigate] = useLocation();
+  const { language, user, token } = useAppContext();
+  
+  // All state declarations must come before any useEffect that depends on them
+  const [persona, setPersona] = useState<string>("");
+  const [mode, setMode] = useState<string>("");
+  const [convId, setConvId] = useState<string>("");
+  const [initialMessage, setInitialMessage] = useState<string>("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [conversationId, setConversationId] = useState<string>("");
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileInfo[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [showUrlModal, setShowUrlModal] = useState(false);
+  const [showQuizzesMenu, setShowQuizzesMenu] = useState(false);
+  const [showQuizzesSettings, setShowQuizzesSettings] = useState(false);
+  const [quizNumQuestions, setQuizNumQuestions] = useState("10");
+  const [quizQuestionType, setQuizQuestionType] = useState("multiple-choice");
+  const [quizDifficulty, setQuizDifficulty] = useState("medium");
+  const [showDoctorMenu, setShowDoctorMenu] = useState(false);
+  const [enableGrounding, setEnableGrounding] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<"conversations" | "modules">("conversations");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoSentRef = useRef(false);
+
+  // Sync URL parameters with state whenever location changes (including query params)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const newPersona = params.get("persona") || "";
+    const newMode = params.get("mode") || "";
+    const newConvId = params.get("convId") || "";
+    const newInitialMessage = params.get("initialMessage") || "";
+    
+    // If persona changed, reset conversation and messages for a fresh start
+    if (newPersona !== persona) {
+      setMessages([]); // Clear previous messages
+      setConversationId(""); // Reset conversation
+      setUploadedFiles([]); // Clear uploaded files
+      setInputValue(""); // Clear input
+      setUrlInput(""); // Clear URL input
+      autoSentRef.current = false; // Reset auto-send flag
+      console.log("[Chat] Persona changed from", persona, "to", newPersona);
+    }
+    
+    setPersona(newPersona);
+    setMode(newMode);
+    setConvId(newConvId);
+    setInitialMessage(newInitialMessage);
+  }, [location, persona]);
+
+  const personaInfo = getPersonaInfo(persona || null);
+  const { toast } = useToast();
+
+  // Sync conversationId with convId when convId changes
+  useEffect(() => {
+    setConversationId(convId);
+  }, [convId]);
+
+  // Update enableGrounding when persona changes
+  useEffect(() => {
+    const shouldEnableGrounding = persona === "ask" || persona === "research" || persona === "doctor" || persona === "scientific-assistant" || persona === "khedive";
+    setEnableGrounding(shouldEnableGrounding);
+  }, [persona]);
+
+  // Load messages when conversationId changes
+  useEffect(() => {
+    if (conversationId) {
+      const loadConversationMessages = async () => {
+        try {
+          const response = await fetch(`/api/conversations/${conversationId}`, {
+            credentials: "include",
+          });
+          if (response.ok) {
+            const conversation = await response.json();
+            if (conversation && conversation.messages) {
+              setMessages(conversation.messages);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load conversation:", error);
+        }
+      };
+      loadConversationMessages();
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const uploadFileMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include", // Send cookies
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Upload failed");
+      }
+
+      return response.json() as Promise<UploadedFileInfo>;
+    },
+    onSuccess: (data) => {
+      // Add file with unique ID to the list (support multiple files)
+      const fileWithId = { ...data, id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` };
+      setUploadedFiles(prev => [...prev, fileWithId]);
+      toast({
+        title: "تم رفع الملف",
+        description: `${data.fileName} جاهز للتحليل`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (data: {
+      message: string;
+      base64Data?: string;
+      fileName?: string;
+      mimeType?: string;
+    }) => {
+      // Get guestId from localStorage to ensure consistency
+      const guestId = localStorage.getItem("guestId") || user?.id;
+      
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // Send cookies (JWT) automatically
+        body: JSON.stringify({
+          message: data.message,
+          conversationId,
+          persona: persona || undefined,
+          systemPrompt: personaInfo.systemPrompt,
+          enableGrounding: persona === "research" ? true : enableGrounding,
+          base64Data: data.base64Data,
+          fileName: data.fileName,
+          mimeType: data.mimeType,
+          guestId: guestId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to send message");
+      }
+
+      return response.json() as Promise<ChatResponse>;
+    },
+    onSuccess: (data) => {
+      setMessages((prev) => [...prev, data.message]);
+      setConversationId(data.sessionId);
+      // Note: Files are NOT cleared automatically - user must explicitly remove them
+      // This allows discussing the same file multiple times
+      // Refresh conversations list when a new message is sent
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+    },
+    onError: (error: any) => {
+      let errorTitle = t("error.message-failed", language);
+      let errorDescription = error.message || t("error.api-error", language);
+      
+      // Check if error message contains Arabic error messages from backend
+      if (error.message?.includes("تم تجاوز حد")) {
+        errorDescription = "تم تجاوز حد الطلبات المسموح. يرجى المحاولة لاحقاً.";
+      } else if (error.message?.includes("حدث خطأ")) {
+        errorDescription = error.message;
+      }
+      
+      toast({
+        title: errorTitle,
+        description: errorDescription,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Auto-send initial message from Hub
+  useEffect(() => {
+    if (initialMessage && !autoSentRef.current) {
+      autoSentRef.current = true;
+      const userMessage = {
+        id: Date.now().toString(),
+        role: "user" as const,
+        content: initialMessage,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      setInputValue("");
+      
+      // Send the message to AI - using setTimeout to ensure mutation is ready
+      const timer = setTimeout(() => {
+        sendMessageMutation.mutate({
+          message: initialMessage,
+        });
+      }, 50);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [initialMessage, sendMessageMutation]);
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() && uploadedFiles.length === 0) {
+      return;
+    }
+
+    // Build file info for user message display
+    const fileInfoForDisplay = uploadedFiles.length > 0 
+      ? { name: uploadedFiles.map(f => f.fileName).join(", "), type: uploadedFiles[0].mimeType }
+      : undefined;
+
+    const userMessage = {
+      id: Date.now().toString(),
+      role: "user" as const,
+      content: inputValue || (uploadedFiles.length > 0 ? "حلل هذه الملفات" : ""),
+      timestamp: new Date(),
+      fileInfo: fileInfoForDisplay,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue("");
+
+    const messageToSend = persona === "quizzes" 
+      ? `${userMessage.content}\n\n[Quiz Settings: ${quizNumQuestions} questions, Type: ${quizQuestionType}, Difficulty: ${quizDifficulty}]`
+      : userMessage.content;
+    
+    // Send with multiple files support - files are NOT cleared after sending
+    // User must explicitly remove files or navigate away
+    if (uploadedFiles.length > 0) {
+      // Use first file for backward compatibility with single file
+      sendMessageMutation.mutate({
+        message: messageToSend,
+        base64Data: uploadedFiles[0].base64Data,
+        fileName: uploadedFiles[0].fileName,
+        mimeType: uploadedFiles[0].mimeType,
+      });
+    } else {
+      sendMessageMutation.mutate({
+        message: messageToSend,
+      });
+    }
+  };
+
+  // Remove a specific file by ID
+  const handleRemoveFile = (fileId: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  // Clear all uploaded files
+  const handleClearAllFiles = () => {
+    setUploadedFiles([]);
+  };
+
+  const handleFileSelect = async (file: File) => {
+    uploadFileMutation.mutate(file);
+  };
+
+
+  if (persona === "ai-images") {
+    return (
+      <div className="h-screen w-screen flex flex-col overflow-hidden" dir={language === "ar" ? "rtl" : "ltr"}>
+        <div className={`fixed ${language === "ar" ? "right-6" : "left-6"} top-6 z-50`}>
+          <Link href="/">
+            <Button
+              size="lg"
+              data-testid="button-back-kiira"
+              className="gap-2 bg-primary/90 hover:bg-primary text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-6 border-2 border-primary/50"
+              title={language === "ar" ? "العودة للرئيسية" : "Back to Home"}
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="font-semibold">{language === "ar" ? "رئيسي" : "Home"}</span>
+            </Button>
+          </Link>
+        </div>
+        <iframe
+          src="https://www.kiira.ai/chat-page/group/d4jlfsnngsas7395p9t0?agentAccountNo=seagen_nano_banana_2_agent&routeName=search&categoryId=Recommend"
+          title="Kiira AI - AI Image Generation"
+          className="w-full h-full border-0"
+          data-testid="kiira-ai-iframe"
+        />
+      </div>
+    );
+  }
+
+  const PersonaIconComponent = getPersonaIcon(persona);
+  
+  return (
+    <div className="relative min-h-screen" dir={language === "ar" ? "rtl" : "ltr"}>
+
+      {/* Floating Navigation Bar */}
+      <FloatingNavBar 
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        isOnChatPage={true}
+      />
+
+      {/* Chat Content */}
+      <div className="relative z-10 min-h-screen flex flex-col">
+      <div className="md:hidden h-3" />
+
+      <main className="flex-1 overflow-hidden flex flex-row">
+        {/* Desktop Sidebar - Always visible */}
+        <div className="hidden md:block">
+          {sidebarMode === "conversations" ? (
+            <ConversationsSidebar 
+              onSelectConversation={(id) => setConversationId(id)}
+              currentConversationId={conversationId}
+              persona={persona}
+              onNewConversation={() => {
+                // Create a new conversation without deleting the current one
+                // The current conversation is automatically saved
+                setConversationId("");
+                setMessages([]);
+                setInputValue("");
+                setUploadedFiles([]);
+              }}
+            />
+          ) : null}
+        </div>
+
+        {/* Mobile Sidebar - Overlay */}
+        {isSidebarOpen && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/50 md:hidden z-30"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+            <div className="fixed left-0 top-0 h-full md:hidden z-40 animate-slide-in flex flex-col">
+              {/* Sidebar Mode Toggle Tabs */}
+              <div className="flex gap-1 p-2">
+                <button
+                  onClick={() => setSidebarMode("conversations")}
+                  className={`flex-1 px-3 py-2 text-xs font-semibold rounded transition-colors ${
+                    sidebarMode === "conversations"
+                      ? "bg-primary/30 text-primary border border-primary/50"
+                      : "bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                  }`}
+                  data-testid="button-tab-conversations"
+                >
+                  {language === "ar" ? "محادثات" : "Chats"}
+                </button>
+                <button
+                  onClick={() => setSidebarMode("modules")}
+                  className={`flex-1 px-3 py-2 text-xs font-semibold rounded transition-colors ${
+                    sidebarMode === "modules"
+                      ? "bg-primary/30 text-primary border border-primary/50"
+                      : "bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                  }`}
+                  data-testid="button-tab-modules"
+                >
+                  {language === "ar" ? "وحدات" : "Modules"}
+                </button>
+              </div>
+
+              {/* Sidebar Content */}
+              {sidebarMode === "conversations" ? (
+                <ConversationsSidebar 
+                  onSelectConversation={(id) => {
+                    setConversationId(id);
+                    setIsSidebarOpen(false);
+                  }}
+                  currentConversationId={conversationId}
+                  persona={persona}
+                  onNewConversation={() => {
+                    // Create a new conversation without deleting the current one
+                    // The current conversation is automatically saved
+                    setConversationId("");
+                    setMessages([]);
+                    setInputValue("");
+                    setUploadedFiles([]);
+                    setIsSidebarOpen(false);
+                  }}
+                />
+              ) : null}
+            </div>
+          </>
+        )}
+        <div className="flex-1 overflow-y-auto flex flex-col px-3 sm:px-4 md:px-6 py-4 sm:py-8">
+          <div className="max-w-3xl w-full mx-auto space-y-4 sm:space-y-6 flex-1 flex flex-col">
+          {messages.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center space-y-6">
+                <PersonaIconComponent className="w-16 sm:w-20 h-16 sm:h-20 text-primary smooth-transition mx-auto mb-4 animate-pulse" />
+                <div>
+                  <h2 className={`text-2xl sm:text-3xl md:text-4xl font-bold text-foreground animate-pulsing-glow ${language === "ar" ? "text-2xl sm:text-3xl md:text-4xl" : ""}`}>
+                    {personaInfo.title}
+                  </h2>
+                  <p className={`text-base sm:text-lg mt-4 text-foreground/80 max-w-xl mx-auto leading-relaxed ${language === "ar" ? "text-lg" : ""}`}>
+                    {personaInfo.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {messages.map((msg) => {
+                // Extract image URLs from JSON format in AI responses (for google-images persona)
+                let isImageMessage = false;
+                let imageUrls: Array<{url: string; title: string}> = [];
+                
+                if (msg.role === "assistant" && persona === "google-images") {
+                  try {
+                    // Try to parse JSON array from the response
+                    // Extract JSON if there's any preamble text
+                    const jsonMatch = msg.content.match(/\[\s*\{[\s\S]*\}\s*\]/);
+                    if (jsonMatch) {
+                      const images = JSON.parse(jsonMatch[0]);
+                      if (Array.isArray(images) && images.length > 0) {
+                        imageUrls = images.map((img: any) => ({
+                          url: img.url || "",
+                          title: img.title || "صورة"
+                        })).filter(img => img.url);
+                        if (imageUrls.length > 0) {
+                          isImageMessage = true;
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    // If JSON parsing fails, continue as normal message
+                  }
+                }
+                
+                return (
+                <div
+                  key={msg.id}
+                  className={`flex w-full ${msg.role === "assistant" ? "justify-start" : "justify-end"}`}
+                  data-testid={`message-${msg.id}`}
+                >
+                  {isImageMessage && msg.role === "assistant" && imageUrls.length > 0 ? (
+                    <div className="max-w-6xl w-full space-y-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                        {imageUrls.map((img, idx) => {
+                          // Use image proxy to bypass hotlinking restrictions
+                          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(img.url)}`;
+                          return (
+                          <div key={idx} className="relative group overflow-hidden rounded-lg aspect-square image-container">
+                            <img 
+                              src={proxyUrl} 
+                              alt={img.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Hide the entire parent container on image load failure
+                                const container = (e.currentTarget.closest('.image-container') as HTMLElement);
+                                if (container) {
+                                  container.style.display = 'none';
+                                }
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <a 
+                                href={img.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                              >
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  data-testid={`button-download-${idx}`}
+                                >
+                                  {language === "ar" ? "تحميل" : "Download"}
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className={`max-w-2xl px-5 py-3 rounded-2xl ${
+                        msg.role === "assistant"
+                          ? "bg-muted/40 text-foreground ai-message"
+                          : "bg-primary/30 text-foreground"
+                      }`}
+                    >
+                      <p className={`whitespace-pre-wrap leading-relaxed ${language === "ar" ? "text-lg font-bold" : "text-sm"}`}>
+                        {msg.content}
+                      </p>
+                      {msg.fileInfo && (
+                        <div className="mt-3 pt-3 border-t border-border/20 text-xs text-muted-foreground flex items-center gap-2">
+                          <Upload className="w-3 h-3" />
+                          {msg.fileInfo.name}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+              })}
+              {sendMessageMutation.isPending && (
+                <div className="flex w-full justify-start">
+                  <div className="max-w-2xl px-5 py-3 rounded-2xl bg-muted/40 text-foreground flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1">
+                        <div
+                          className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                          style={{ animationDelay: "0ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 rounded-full bg-accent animate-bounce"
+                          style={{ animationDelay: "150ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                          style={{ animationDelay: "300ms" }}
+                        ></div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{t("chat.thinking", language)}</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          <div ref={messagesEndRef} />
+          </div>
+        </div>
+      </main>
+
+      <footer className="sticky bottom-0">
+        <div className="max-w-3xl w-full mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
+          {/* Multiple files display */}
+          {uploadedFiles.length > 0 && (
+            <div className="p-3 bg-accent/10 border border-accent/30 rounded-xl text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-primary">
+                  {language === "ar" ? `${uploadedFiles.length} ملف مرفق` : `${uploadedFiles.length} file(s) attached`}
+                </span>
+                {uploadedFiles.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearAllFiles}
+                    data-testid="button-clear-all-files"
+                    className="h-6 px-2 text-destructive hover:text-destructive"
+                  >
+                    {language === "ar" ? "حذف الكل" : "Clear All"}
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {uploadedFiles.map((file) => (
+                  <div key={file.id} className="flex items-center gap-2 bg-background/50 rounded-lg px-2 py-1">
+                    <Upload className="w-3 h-3" />
+                    <span className="max-w-32 truncate">{file.fileName}</span>
+                    <button
+                      onClick={() => handleRemoveFile(file.id)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                      data-testid={`button-remove-file-${file.id}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+
+          <div className="neon-input-container flex items-center gap-3 bg-muted/30 rounded-full pl-5 pr-2 py-2 border border-primary/40 focus-within:outline-none focus-within:ring-0">
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+              className="hidden"
+              data-testid="input-file"
+            />
+
+            {personaInfo.controlIcons?.includes("upload") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadFileMutation.isPending || sendMessageMutation.isPending}
+                data-testid="button-upload-file"
+                className="h-8 w-8"
+                title={language === "ar" ? "رفع ملف" : "Upload File"}
+              >
+                {uploadFileMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4" />
+                )}
+              </Button>
+            )}
+
+            {personaInfo.controlIcons?.includes("search") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEnableGrounding(!enableGrounding)}
+                disabled={sendMessageMutation.isPending}
+                data-testid="button-search"
+                className={`h-8 w-8 ${enableGrounding ? "text-primary" : ""}`}
+                title={language === "ar" ? "بحث جوجل" : "Google Search"}
+              >
+                <Search className="w-4 h-4" />
+              </Button>
+            )}
+
+            {personaInfo.controlIcons?.includes("ai-only") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEnableGrounding(false)}
+                disabled={sendMessageMutation.isPending}
+                data-testid="button-ai-only"
+                className={`h-8 w-8 ${!enableGrounding ? "text-primary" : ""}`}
+                title={language === "ar" ? "ذكاء فقط" : "AI Only"}
+              >
+                <Radio className="w-4 h-4" />
+              </Button>
+            )}
+
+            {personaInfo.controlIcons?.includes("google-scholar") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.open("https://scholar.google.com/", "_blank")}
+                disabled={sendMessageMutation.isPending}
+                data-testid="button-google-scholar"
+                className="h-8 w-8"
+                title={language === "ar" ? "Google Scholar" : "Google Scholar"}
+              >
+                <Globe className="w-4 h-4" />
+              </Button>
+            )}
+
+            {personaInfo.controlIcons?.includes("pubmed") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.open("https://pubmed.ncbi.nlm.nih.gov/", "_blank")}
+                disabled={sendMessageMutation.isPending}
+                data-testid="button-pubmed"
+                className="h-8 w-8"
+                title={language === "ar" ? "PubMed" : "PubMed"}
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            )}
+
+            {personaInfo.controlIcons?.includes("research-db") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.open("https://www.researchgate.net/", "_blank")}
+                disabled={sendMessageMutation.isPending}
+                data-testid="button-research-db"
+                className="h-8 w-8"
+                title={language === "ar" ? "ResearchGate" : "ResearchGate"}
+              >
+                <Database className="w-4 h-4" />
+              </Button>
+            )}
+
+            {(personaInfo.controlIcons?.includes("upload-source") || persona === "doctor" || persona === "quizzes" || persona === "scientific-assistant" || persona === "khedive") && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadFileMutation.isPending}
+                  data-testid="button-upload-source"
+                  className="h-8 w-8"
+                  title={language === "ar" ? "رفع مصدر" : "Upload Source"}
+                >
+                  <Upload className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowUrlModal(true)}
+                  disabled={sendMessageMutation.isPending}
+                  data-testid="button-url-input"
+                  className="h-8 w-8"
+                  title={language === "ar" ? "رابط URL" : "URL Link"}
+                >
+                  <Link2 className="w-4 h-4" />
+                </Button>
+                {persona === "quizzes" && (
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowQuizzesSettings(!showQuizzesSettings)}
+                      disabled={sendMessageMutation.isPending}
+                      data-testid="button-quiz-settings"
+                      className="h-8 w-8"
+                      title={language === "ar" ? "إعدادات الاختبار" : "Quiz Settings"}
+                    >
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                    
+                    {showQuizzesSettings && (
+                      <div className="absolute bottom-10 right-0 bg-card border border-border rounded-lg shadow-lg z-50 p-3 w-72">
+                        <h4 className="font-bold mb-3 text-sm">{language === "ar" ? "إعدادات الاختبار" : "Quiz Settings"}</h4>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-xs font-semibold mb-1 block">{language === "ar" ? "عدد الأسئلة" : "Number of Questions"}</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="50"
+                              value={quizNumQuestions}
+                              onChange={(e) => setQuizNumQuestions(e.target.value)}
+                              data-testid="input-quiz-count"
+                              className="w-full px-2 py-1 rounded border border-border bg-background text-sm"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs font-semibold mb-1 block">{language === "ar" ? "نوع الأسئلة" : "Question Type"}</label>
+                            <select
+                              value={quizQuestionType}
+                              onChange={(e) => setQuizQuestionType(e.target.value)}
+                              data-testid="select-question-type"
+                              className="w-full px-2 py-1 rounded border border-border bg-background text-sm"
+                            >
+                              <option value="multiple-choice">{language === "ar" ? "اختيار من متعدد" : "Multiple Choice"}</option>
+                              <option value="true-false">{language === "ar" ? "صح/خطأ" : "True/False"}</option>
+                              <option value="mixed">{language === "ar" ? "مختلط" : "Mixed"}</option>
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs font-semibold mb-1 block">{language === "ar" ? "مستوى الصعوبة" : "Difficulty Level"}</label>
+                            <select
+                              value={quizDifficulty}
+                              onChange={(e) => setQuizDifficulty(e.target.value)}
+                              data-testid="select-difficulty"
+                              className="w-full px-2 py-1 rounded border border-border bg-background text-sm"
+                            >
+                              <option value="easy">{language === "ar" ? "سهل" : "Easy"}</option>
+                              <option value="medium">{language === "ar" ? "متوسط" : "Medium"}</option>
+                              <option value="hard">{language === "ar" ? "صعب" : "Hard"}</option>
+                            </select>
+                          </div>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowQuizzesSettings(false)}
+                            data-testid="button-close-settings"
+                            className="w-full mt-2"
+                          >
+                            {language === "ar" ? "تم" : "Done"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {persona === "chat" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowUrlModal(true)}
+                disabled={sendMessageMutation.isPending}
+                data-testid="button-url"
+                className="h-8 w-8"
+                title={language === "ar" ? "إضافة رابط" : "Add URL"}
+              >
+                <Link2 className="w-4 h-4" />
+              </Button>
+            )}
+
+            <Input
+              placeholder={t("chat.placeholder", language)}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              disabled={sendMessageMutation.isPending}
+              data-testid="input-message"
+              className="border-0 bg-transparent placeholder:text-muted-foreground/50 !ring-0 !outline-none focus-visible:!ring-0 focus-visible:!outline-none focus:!ring-0 focus:!outline-none ring-offset-0 focus-visible:ring-offset-0 flex-1"
+            />
+
+            <Button
+              onClick={handleSendMessage}
+              disabled={
+                (!inputValue.trim() && uploadedFiles.length === 0) ||
+                sendMessageMutation.isPending
+              }
+              data-testid="button-send"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+            >
+              {sendMessageMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+
+          {showUrlModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-card p-6 rounded-lg w-96 shadow-lg">
+                <h3 className="font-bold mb-4">{language === "ar" ? "إضافة رابط" : "Add URL"}</h3>
+                <Input
+                  placeholder={language === "ar" ? "الصق الرابط هنا..." : "Paste URL here..."}
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  className="mb-4"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => {
+                      setShowUrlModal(false);
+                      setUrlInput("");
+                    }} 
+                    variant="outline" 
+                    className="flex-1"
+                  >
+                    {language === "ar" ? "إلغاء" : "Cancel"}
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if (urlInput.trim()) {
+                        const userMessage = {
+                          id: Date.now().toString(),
+                          role: "user" as const,
+                          content: `${urlInput}`,
+                          timestamp: new Date(),
+                        };
+                        setMessages((prev) => [...prev, userMessage]);
+                        setInputValue("");
+                        sendMessageMutation.mutate({
+                          message: `يرجى جلب محتوى هذا الرابط ومناقشته معي: ${urlInput}`,
+                        });
+                        setShowUrlModal(false);
+                        setUrlInput("");
+                      }
+                    }} 
+                    className="flex-1"
+                  >
+                    {language === "ar" ? "تم" : "Done"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </footer>
+      </div>
+    </div>
+  );
+}
