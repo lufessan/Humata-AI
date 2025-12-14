@@ -4,7 +4,7 @@
 
 ### Environment Variables
 All sensitive keys are properly managed using `process.env`:
-- `GEMINI_API_KEY` - Google Gemini API key (used in `server/gemini.ts`)
+- `GROQ_API_KEY` - Groq API key for LLM inference (used in `server/groq.ts`)
 - `SESSION_SECRET` - JWT secret for session authentication (used in `server/index.ts` and `server/routes.ts`)
 - `DATABASE_URL` - PostgreSQL connection string (used in Drizzle config)
 - `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` - PostgreSQL credentials
@@ -13,6 +13,7 @@ All sensitive keys are properly managed using `process.env`:
 - ✅ No hardcoded secrets in public code
 - ✅ All keys loaded from `process.env` with safe fallbacks
 - ✅ `.gitignore` updated to exclude `.env` files
+- ✅ No Google Vision or Gemini API dependencies
 
 ### Git Security
 Updated `.gitignore` to exclude:
@@ -59,7 +60,7 @@ Runs: `NODE_ENV=production node dist/index.cjs`
 3. **Set Environment Variables:**
    Create a `.env` file (not committed to git):
    ```
-   GEMINI_API_KEY=your_gemini_api_key
+   GROQ_API_KEY=your_groq_api_key
    SESSION_SECRET=your_jwt_secret_key
    DATABASE_URL=postgresql://user:password@host:port/database
    PGHOST=host
@@ -94,7 +95,7 @@ Runs: `NODE_ENV=production node dist/index.cjs`
 - Workflow automatically runs `npm run dev` in development
 - Use publishing button for production deployment
 
-#### Other Platforms (Vercel, Heroku, etc.)
+#### Other Platforms (Vercel, Heroku, Render, etc.)
 - Set environment variables in platform dashboard
 - Use `npm start` as the start command
 - Ensure Node.js 18+ is available
@@ -109,13 +110,15 @@ Runs: `NODE_ENV=production node dist/index.cjs`
 - [x] Dependencies pinned to specific versions
 - [x] JWT authentication implemented
 - [x] Database credentials managed via env vars
+- [x] No external vision/image processing APIs
 
 ### Build Output
 
 The production build creates `dist/index.cjs` which includes:
 - Express server with API routes
 - Authentication middleware
-- Gemini API integration
+- Groq LLM integration
+- Local Tesseract.js OCR (no external API calls)
 - Database connectivity
 - Frontend compiled as static assets
 
@@ -125,15 +128,18 @@ The production build creates `dist/index.cjs` which includes:
 - Server uses Express with middleware for auth and logging
 - Database pooling managed by `@neondatabase/serverless`
 - Multer configured for 20MB file uploads
+- OCR processed locally with Tesseract.js (no external dependencies)
 
 ### Monitoring & Logging
 
 - All API requests logged with timestamp, method, path, status, and duration
 - Error handling with proper HTTP status codes
-- Gemini API errors caught with user-friendly messages
+- Groq API errors caught with user-friendly messages
+- OCR processing logs for debugging
 
 ---
 
-**Last Updated:** November 30, 2025  
-**Version:** 1.0.0  
-**Status:** Production Ready ✅
+**Last Updated:** December 14, 2025  
+**Version:** 2.0.0  
+**Status:** Production Ready ✅  
+**Note:** Google Gemini/Vision dependencies completely removed for Render Free deployment

@@ -5,13 +5,13 @@
 ### Properly Managed Secrets
 All sensitive information is managed through environment variables:
 
-1. **GEMINI_API_KEY**
-   - Location: `server/gemini.ts` line 8
-   - Usage: `const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" })`
-   - Type: API Key for Google Generative AI
+1. **GROQ_API_KEY**
+   - Location: `server/groq.ts` line 10
+   - Usage: `const groq = new Groq({ apiKey: GROQ_API_KEY || "" })`
+   - Type: API Key for Groq LLM inference
 
 2. **SESSION_SECRET (JWT)**
-   - Location: `server/index.ts` line 31 and `server/routes.ts` line 60
+   - Location: `server/index.ts` and `server/routes.ts`
    - Usage: `const JWT_SECRET = process.env.SESSION_SECRET || "fallback-secret-key"`
    - Type: Secret key for JWT token signing/verification
    - Fallback: Safe fallback provided for development
@@ -28,6 +28,11 @@ All sensitive data is:
 - Read from `process.env` at runtime
 - Never logged or exposed in error messages
 - Protected by `.gitignore` for `.env` files
+
+### No External Vision APIs
+✅ **Verified:** No Google Gemini, Google Vision, or external vision API dependencies.
+- Image OCR: Uses local Tesseract.js (no API calls)
+- LLM: Uses Groq (configured with API key)
 
 ## Git & Repository Security
 
@@ -77,7 +82,7 @@ Before pushing to GitHub:
 
 ### Password Security
 - Hashing: SHA256 (via Node.js crypto module)
-- Implementation: `server/routes.ts` line 56-58
+- Implementation: `server/routes.ts` line 60-62
 - Note: For production, consider bcrypt or Argon2
 
 ### Authorization
@@ -88,9 +93,8 @@ Before pushing to GitHub:
 ## API Security
 
 ### Input Validation
-- File uploads: MIME type filtering (lines 18-24 in `server/routes.ts`)
+- File uploads: MIME type filtering (lines 18-28 in `server/routes.ts`)
 - Message content: XSS protection via content-type headers
-- URL inputs: Validated before sending to Gemini API
 - JSON payloads: Express.json middleware with 50MB limit
 
 ### CORS & Headers
@@ -99,8 +103,13 @@ Before pushing to GitHub:
 - File size limits: 20MB per upload
 
 ### Rate Limiting
-- Gemini API: Built-in quota management (50 requests/day free tier)
+- Groq API: Built-in quota management
 - File uploads: Multer limits to 20MB per file
+
+### Third-Party API Security
+- ✅ Groq: Industry-standard LLM provider
+- ✅ Tesseract.js: Local-only, no external API calls
+- ✅ No Google Vision, Gemini, or other external vision APIs
 
 ## Database Security
 
@@ -128,6 +137,7 @@ Before pushing to GitHub:
 - [ ] Environment variables set in deployment platform
 - [ ] `npm run build` succeeds without errors
 - [ ] No secrets in build output (`dist/index.cjs`)
+- [ ] No external API calls in bundled code
 - [ ] HTTPS enabled (if applicable)
 - [ ] Database backups configured
 - [ ] Log monitoring activated
@@ -144,7 +154,7 @@ If a secret is accidentally committed:
    ```
 
 2. **Revoke & Regenerate:**
-   - Rotate GEMINI_API_KEY in Google Console
+   - Rotate GROQ_API_KEY in Groq console
    - Regenerate SESSION_SECRET
    - Reset database credentials
 
@@ -166,8 +176,10 @@ If a secret is accidentally committed:
 6. ✅ Monitor API usage and logs
 7. ✅ Keep dependencies updated (`npm audit`)
 8. ✅ Use HTTPS everywhere in production
+9. ✅ Use only self-hosted or trusted third-party APIs (no Google Vision)
 
 ---
 
-**Last Updated:** November 30, 2025  
-**Status:** Secure ✅
+**Last Updated:** December 14, 2025  
+**Status:** Secure ✅  
+**Note:** Google Gemini and Vision APIs completely removed. Using local OCR only.
