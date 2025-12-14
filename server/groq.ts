@@ -3,6 +3,7 @@ import * as fs from "fs";
 import mammoth from "mammoth";
 import { createRequire } from "module";
 import Tesseract from "tesseract.js";
+import sharp from "sharp";
 
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
@@ -16,7 +17,7 @@ if (!GROQ_API_KEY) {
   console.log(`[Groq] API key configured, using model: ${REASONING_MODEL} (reasoning)`);
 }
 
-console.log("[OCR] Using Tesseract.js for local image text extraction (no API key required)");
+console.log("[OCR] Enhanced Arabic OCR pipeline with Sharp preprocessing + Tesseract.js + LLM correction");
 
 const groq = new Groq({
   apiKey: GROQ_API_KEY || "",
@@ -71,35 +72,442 @@ async function extractTextFromDOCX(base64Data: string): Promise<string> {
   }
 }
 
-async function extractTextFromImageWithOCR(base64Data: string, mimeType: string): Promise<string> {
-  console.log("[OCR] Starting local Tesseract.js OCR (no API key required)");
+async function estimateSkewAngle(imageBuffer: Buffer): Promise<number> {
+  try {
+    const { data, info } = await sharp(imageBuffer)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    
+    const width = info.width;
+    const height = info.height;
+    const channels = info.channels;
+    
+    const testAngles = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+    let bestAngle = 0;
+    let maxVariance = 0;
+    
+    for (const angle of testAngles) {
+      const rotatedBuffer = await sharp(imageBuffer)
+        .rotate(angle, { background: { r: 255, g: 255, b: 255 } })
+        .png()
+        .toBuffer();
+      
+      const { data: rotData, info: rotInfo } = await sharp(rotatedBuffer)
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      
+      const rowSums: number[] = [];
+      for (let y = 0; y < rotInfo.height; y++) {
+        let rowSum = 0;
+        for (let x = 0; x < rotInfo.width; x++) {
+          const idx = (y * rotInfo.width + x) * rotInfo.channels;
+          rowSum += rotData[idx] < 128 ? 1 : 0;
+        }
+        rowSums.push(rowSum);
+      }
+      
+      const mean = rowSums.reduce((a, b) => a + b, 0) / rowSums.length;
+      const variance = rowSums.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / rowSums.length;
+      
+      if (variance > maxVariance) {
+        maxVariance = variance;
+        bestAngle = angle;
+      }
+    }
+    
+    console.log(`[OCR-Deskew] Estimated skew angle: ${bestAngle} degrees`);
+    return bestAngle;
+  } catch (error: any) {
+    console.error("[OCR-Deskew] Skew estimation error:", error.message);
+    return 0;
+  }
+}
+
+async function applyDeskew(imageBuffer: Buffer): Promise<Buffer> {
+  const skewAngle = await estimateSkewAngle(imageBuffer);
+  
+  if (Math.abs(skewAngle) < 0.5) {
+    console.log("[OCR-Deskew] No significant skew detected, skipping correction");
+    return imageBuffer;
+  }
+  
+  console.log(`[OCR-Deskew] Applying rotation correction: ${skewAngle} degrees`);
+  return sharp(imageBuffer)
+    .rotate(skewAngle, { background: { r: 255, g: 255, b: 255 } })
+    .png()
+    .toBuffer();
+}
+
+async function applyDilation(imageBuffer: Buffer, kernelSize: number = 3): Promise<Buffer> {
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  
+  const width = info.width;
+  const height = info.height;
+  const channels = info.channels;
+  const half = Math.floor(kernelSize / 2);
+  
+  const outputData = Buffer.alloc(data.length);
+  outputData.fill(255);
+  
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * channels;
+      
+      if (data[idx] < 128) {
+        for (let dy = -half; dy <= half; dy++) {
+          for (let dx = -half; dx <= half; dx++) {
+            const ny = y + dy;
+            const nx = x + dx;
+            if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+              const nidx = (ny * width + nx) * channels;
+              for (let c = 0; c < channels; c++) {
+                outputData[nidx + c] = 0;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return sharp(outputData, {
+    raw: { width, height, channels }
+  }).png().toBuffer();
+}
+
+async function applyErosion(imageBuffer: Buffer, kernelSize: number = 3): Promise<Buffer> {
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  
+  const width = info.width;
+  const height = info.height;
+  const channels = info.channels;
+  const half = Math.floor(kernelSize / 2);
+  
+  const outputData = Buffer.alloc(data.length);
+  outputData.fill(255);
+  
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * channels;
+      let allBlack = true;
+      
+      for (let dy = -half; dy <= half && allBlack; dy++) {
+        for (let dx = -half; dx <= half && allBlack; dx++) {
+          const ny = y + dy;
+          const nx = x + dx;
+          if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+            const nidx = (ny * width + nx) * channels;
+            if (data[nidx] >= 128) {
+              allBlack = false;
+            }
+          } else {
+            allBlack = false;
+          }
+        }
+      }
+      
+      if (allBlack) {
+        for (let c = 0; c < channels; c++) {
+          outputData[idx + c] = 0;
+        }
+      }
+    }
+  }
+  
+  return sharp(outputData, {
+    raw: { width, height, channels }
+  }).png().toBuffer();
+}
+
+async function applyMorphologicalClosing(imageBuffer: Buffer, kernelSize: number = 3): Promise<Buffer> {
+  console.log("[OCR-Morph] Applying closing (dilation then erosion)");
+  const dilated = await applyDilation(imageBuffer, kernelSize);
+  return applyErosion(dilated, kernelSize);
+}
+
+async function applyMorphologicalOpening(imageBuffer: Buffer, kernelSize: number = 3): Promise<Buffer> {
+  console.log("[OCR-Morph] Applying opening (erosion then dilation)");
+  const eroded = await applyErosion(imageBuffer, kernelSize);
+  return applyDilation(eroded, kernelSize);
+}
+
+async function applyAdaptiveThreshold(imageBuffer: Buffer, blockSize: number = 21, C: number = 8): Promise<Buffer> {
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  
+  const width = info.width;
+  const height = info.height;
+  const channels = info.channels;
+  
+  const integral = new Float64Array((width + 1) * (height + 1));
+  for (let y = 0; y < height; y++) {
+    let rowSum = 0;
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * channels;
+      rowSum += data[idx];
+      integral[(y + 1) * (width + 1) + (x + 1)] = 
+        integral[y * (width + 1) + (x + 1)] + rowSum;
+    }
+  }
+  
+  const outputData = Buffer.alloc(data.length);
+  const halfBlock = Math.floor(blockSize / 2);
+  
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const x1 = Math.max(0, x - halfBlock);
+      const y1 = Math.max(0, y - halfBlock);
+      const x2 = Math.min(width - 1, x + halfBlock);
+      const y2 = Math.min(height - 1, y + halfBlock);
+      
+      const area = (x2 - x1 + 1) * (y2 - y1 + 1);
+      const sum = integral[(y2 + 1) * (width + 1) + (x2 + 1)]
+                - integral[(y2 + 1) * (width + 1) + x1]
+                - integral[y1 * (width + 1) + (x2 + 1)]
+                + integral[y1 * (width + 1) + x1];
+      
+      const localMean = sum / area;
+      const idx = (y * width + x) * channels;
+      const pixelValue = data[idx];
+      const threshold = localMean - C;
+      const newValue = pixelValue > threshold ? 255 : 0;
+      
+      for (let c = 0; c < channels; c++) {
+        outputData[idx + c] = newValue;
+      }
+    }
+  }
+  
+  return sharp(outputData, {
+    raw: { width, height, channels }
+  }).png().toBuffer();
+}
+
+async function preprocessImageForOCR(imageBuffer: Buffer, attempt: number = 1): Promise<Buffer> {
+  console.log(`[OCR-Preprocess] Starting advanced image preprocessing pipeline (attempt ${attempt})`);
   
   try {
-    const imageBuffer = Buffer.from(base64Data, "base64");
+    const metadata = await sharp(imageBuffer).metadata();
+    console.log(`[OCR-Preprocess] Original image: ${metadata.width}x${metadata.height}, format: ${metadata.format}`);
     
-    const result = await Tesseract.recognize(
-      imageBuffer,
+    console.log("[OCR-Preprocess] Step 1: Convert to grayscale and remove color/glow effects");
+    let processedBuffer = await sharp(imageBuffer)
+      .grayscale()
+      .png()
+      .toBuffer();
+    
+    console.log("[OCR-Preprocess] Step 2: Enhance contrast with normalization");
+    processedBuffer = await sharp(processedBuffer)
+      .normalize()
+      .png()
+      .toBuffer();
+    
+    const contrastMultiplier = attempt === 1 ? 1.3 : 1.5;
+    console.log(`[OCR-Preprocess] Step 3: Apply linear contrast enhancement (factor: ${contrastMultiplier})`);
+    processedBuffer = await sharp(processedBuffer)
+      .linear(contrastMultiplier, -20)
+      .png()
+      .toBuffer();
+    
+    console.log("[OCR-Preprocess] Step 4: Apply median filter for noise removal");
+    processedBuffer = await sharp(processedBuffer)
+      .median(3)
+      .png()
+      .toBuffer();
+    
+    console.log("[OCR-Preprocess] Step 5: Apply sharpening for clearer edges");
+    processedBuffer = await sharp(processedBuffer)
+      .sharpen({ sigma: 1.5 })
+      .png()
+      .toBuffer();
+    
+    const width = metadata.width || 800;
+    const height = metadata.height || 600;
+    if (width < 1000 || height < 1000) {
+      const scaleFactor = Math.max(1000 / width, 1000 / height, 1.5);
+      const newWidth = Math.round(width * scaleFactor);
+      const newHeight = Math.round(height * scaleFactor);
+      console.log(`[OCR-Preprocess] Step 6: Smart resize from ${width}x${height} to ${newWidth}x${newHeight}`);
+      processedBuffer = await sharp(processedBuffer)
+        .resize(newWidth, newHeight, {
+          kernel: sharp.kernel.lanczos3,
+          withoutEnlargement: false
+        })
+        .png()
+        .toBuffer();
+    }
+    
+    console.log("[OCR-Preprocess] Step 7: Apply deskew (rotation correction)");
+    processedBuffer = await applyDeskew(processedBuffer);
+    
+    const blockSize = attempt === 1 ? 21 : 31;
+    const thresholdC = attempt === 1 ? 8 : 12;
+    console.log(`[OCR-Preprocess] Step 8: Apply adaptive thresholding (blockSize=${blockSize}, C=${thresholdC})`);
+    processedBuffer = await applyAdaptiveThreshold(processedBuffer, blockSize, thresholdC);
+    
+    const closingKernelSize = attempt === 1 ? 3 : 5;
+    console.log(`[OCR-Preprocess] Step 9: Morphological closing (kernel=${closingKernelSize}) - reconnect broken Arabic letters`);
+    processedBuffer = await applyMorphologicalClosing(processedBuffer, closingKernelSize);
+    
+    const openingKernelSize = attempt === 1 ? 2 : 3;
+    console.log(`[OCR-Preprocess] Step 10: Morphological opening (kernel=${openingKernelSize}) - separate overly merged text`);
+    processedBuffer = await applyMorphologicalOpening(processedBuffer, openingKernelSize);
+    
+    console.log(`[OCR-Preprocess] Preprocessing complete. Output size: ${processedBuffer.length} bytes`);
+    return processedBuffer;
+  } catch (error: any) {
+    console.error("[OCR-Preprocess] Preprocessing error:", error.message);
+    
+    if (attempt < 2) {
+      console.log("[OCR-Preprocess] Retrying with simplified preprocessing");
+      try {
+        const simplifiedBuffer = await sharp(imageBuffer)
+          .grayscale()
+          .normalize()
+          .sharpen()
+          .png()
+          .toBuffer();
+        return simplifiedBuffer;
+      } catch (fallbackError: any) {
+        console.error("[OCR-Preprocess] Simplified preprocessing also failed:", fallbackError.message);
+      }
+    }
+    
+    console.log("[OCR-Preprocess] Applying minimal preprocessing (grayscale only)");
+    return sharp(imageBuffer).grayscale().png().toBuffer();
+  }
+}
+
+async function correctArabicOCRText(rawText: string): Promise<string> {
+  if (!GROQ_API_KEY) {
+    console.log("[OCR-Correct] No API key available, skipping LLM correction");
+    return rawText;
+  }
+  
+  if (!rawText || rawText.length < 5) {
+    console.log("[OCR-Correct] Text too short for correction");
+    return rawText;
+  }
+  
+  console.log("[OCR-Correct] Starting LLM-based Arabic text correction");
+  
+  const correctionPrompt = `أنت نظام متخصص في تصحيح النص العربي المستخرج من OCR.
+
+النص قد يحتوي على:
+- أحرف مكسورة أو تالفة (مثل ��)
+- أخطاء إملائية
+- مسافات غير صحيحة
+- كلمات متصلة أو منفصلة بشكل خاطئ
+- خلط بين أحرف عربية متشابهة (ي/ى، ه/ة، ب/ت/ث، ل/لا)
+
+مهمتك:
+1. تصحيح الأخطاء الإملائية والحروف فقط
+2. إعادة كتابة النص بعربية فصحى واضحة وصحيحة
+3. لا تغير المعنى الأصلي
+4. لا تضف معلومات جديدة
+5. حافظ على البنية والقصد الأصلي
+6. أزل الرموز غير القابلة للقراءة أو استبدلها حسب السياق
+
+أخرج النص المصحح فقط بدون أي شرح أو تعليق.
+
+النص الخام من OCR:
+${rawText}`;
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: REASONING_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: "أنت مصحح لغوي متخصص في تصحيح النصوص العربية المستخرجة من OCR. أخرج النص المصحح فقط."
+        },
+        {
+          role: "user",
+          content: correctionPrompt
+        }
+      ],
+      max_tokens: 2048,
+      temperature: 0.1,
+    });
+
+    const correctedText = completion.choices[0]?.message?.content?.trim();
+    
+    if (!correctedText) {
+      console.log("[OCR-Correct] No correction generated, using original");
+      return rawText;
+    }
+    
+    console.log(`[OCR-Correct] Text corrected: ${rawText.length} -> ${correctedText.length} chars`);
+    return correctedText;
+  } catch (error: any) {
+    console.error("[OCR-Correct] Correction error:", error.message);
+    return rawText;
+  }
+}
+
+async function extractTextFromImageWithOCR(base64Data: string, mimeType: string): Promise<string> {
+  console.log("[OCR] Starting enhanced Arabic OCR pipeline with preprocessing");
+  
+  try {
+    const originalBuffer = Buffer.from(base64Data, "base64");
+    console.log(`[OCR] Original image size: ${originalBuffer.length} bytes`);
+    
+    console.log("[OCR] Phase 1: Image preprocessing (attempt 1)");
+    let processedBuffer = await preprocessImageForOCR(originalBuffer, 1);
+    
+    console.log("[OCR] Phase 2: Running Tesseract OCR on preprocessed image");
+    let result = await Tesseract.recognize(
+      processedBuffer,
       "ara+eng",
       {
         logger: (m) => {
           if (m.status === "recognizing text") {
-            console.log(`[OCR] Progress: ${Math.round(m.progress * 100)}%`);
+            console.log(`[OCR] Recognition progress: ${Math.round(m.progress * 100)}%`);
           }
         }
       }
     );
     
-    const extractedText = result.data.text.trim();
+    let rawText = result.data.text.trim();
     
-    if (!extractedText) {
-      console.log("[OCR] No text found in image");
-      return "[صورة - لم يتم العثور على نص قابل للقراءة في الصورة]";
+    if (!rawText || rawText.length < 3) {
+      console.log("[OCR] No/minimal text found, retrying with alternate preprocessing parameters");
+      processedBuffer = await preprocessImageForOCR(originalBuffer, 2);
+      
+      result = await Tesseract.recognize(
+        processedBuffer,
+        "ara+eng",
+        {
+          logger: (m) => {
+            if (m.status === "recognizing text") {
+              console.log(`[OCR] Retry recognition progress: ${Math.round(m.progress * 100)}%`);
+            }
+          }
+        }
+      );
+      
+      rawText = result.data.text.trim();
+      
+      if (!rawText || rawText.length < 3) {
+        console.log("[OCR] No text found in image after all preprocessing attempts");
+        return "[صورة - لم يتم العثور على نص قابل للقراءة في الصورة]";
+      }
     }
     
-    console.log(`[OCR] Successfully extracted ${extractedText.length} characters from image`);
-    return `[نص مستخرج من الصورة باستخدام OCR]:\n${extractedText}`;
+    console.log(`[OCR] Raw OCR extracted ${rawText.length} characters`);
+    
+    console.log("[OCR] Phase 3: LLM-based Arabic text correction");
+    const correctedText = await correctArabicOCRText(rawText);
+    
+    console.log(`[OCR] Enhanced OCR pipeline complete. Final text: ${correctedText.length} chars`);
+    return `[نص مستخرج من الصورة باستخدام OCR المحسّن]:\n${correctedText}`;
   } catch (error: any) {
-    console.error("[OCR] Error during text extraction:", error.message);
+    console.error("[OCR] Error during enhanced extraction:", error.message);
     return "[صورة - فشل في استخراج النص من الصورة]";
   }
 }

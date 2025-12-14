@@ -8,11 +8,19 @@ Application is production-ready with all 8 primary modules fully integrated and 
 
 ## AI Stack (No Google Dependencies)
 - **LLM**: Groq (llama-3.3-70b-versatile) - Fast inference
-- **OCR**: Tesseract.js (local, no external API calls)
+- **OCR**: Enhanced Arabic OCR Pipeline:
+  - **Phase 1**: Sharp image preprocessing (grayscale, contrast, thresholding, noise removal, deskew, morphological operations)
+  - **Phase 2**: Tesseract.js text extraction (Arabic + English)
+  - **Phase 3**: LLM-based Arabic text correction (fixes OCR errors, broken characters, spacing issues)
 - **File Parsing**: pdf-parse, mammoth (local processing)
 - **NO Google Vision, NO Gemini, NO external vision APIs**
 
 ## Recent Changes
+- **December 14, 2025**: Enhanced Arabic OCR Pipeline
+  - Added Sharp image preprocessing (grayscale, contrast, thresholding, noise removal, morphological ops)
+  - Integrated LLM-based Arabic text correction for OCR output
+  - Smart resize for small images, adaptive thresholding, deskew support
+  - Fallback to original image if preprocessing fails
 - **December 14, 2025**: Complete Google Vision/Gemini Removal
   - Removed all Gemini API dependencies
   - Switched to Groq LLM for text processing
