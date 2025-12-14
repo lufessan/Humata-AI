@@ -16,6 +16,14 @@ Application is production-ready with all 8 primary modules fully integrated and 
 - **NO Google Vision, NO Gemini, NO external vision APIs**
 
 ## Recent Changes
+- **December 14, 2025**: SmartInputBox with Grouped Feature Icons
+  - New reusable SmartInputBox component with icons embedded inside input fields
+  - 4 icon groups: Learning Modes (Auto/Student/Teacher), Study Tools (Pack/Image/Explain), Assessment (Exam/Why Wrong/Insights), Options (Difficulty/Memory)
+  - Context-aware behavior: icons adapt based on page (chat/dashboard/tools/course)
+  - Persona-based auto-selection: quizzes→exam mode, research→study pack, doctor→explain mode
+  - localStorage persistence for user preferences
+  - Integrated in Chat.tsx and Hub.tsx (quick action input)
+  - Full RTL Arabic support with proper icon positioning
 - **December 14, 2025**: Universal Image Understanding System
   - Added Llama 4 Maverick vision model for intelligent image analysis
   - Image classification: automatically detects document, UI, diagram, or mixed content
