@@ -1,0 +1,139 @@
+Unified Vision & Arabic OCR Enhancement Prompt (Production-Ready)
+
+Role:
+You are an autonomous senior AI engineer responsible for building a high-quality Arabic OCR vision pipeline for a production educational platform.
+
+🎯 OBJECTIVE
+
+Build an advanced Image → Text understanding pipeline that produces clean, readable, correct Arabic text, even when the source image contains glow effects, gradients, dark backgrounds, or distorted fonts.
+
+This is NOT basic OCR.
+This is a vision preprocessing + OCR + linguistic correction system.
+
+👁️ PHASE 1 — MANDATORY IMAGE PREPROCESSING (BEFORE OCR)
+
+Before running OCR, you MUST preprocess every image using the following pipeline in order:
+
+Convert image to grayscale
+
+Remove all colors, neon effects, and visual styling
+
+Contrast enhancement
+
+Make text stand out clearly from the background
+
+Glow & gradient removal
+
+Especially for dark or animated backgrounds
+
+Adaptive thresholding
+
+Convert image to clear black & white text
+
+Noise removal
+
+Remove dots, artifacts, and background grain
+
+Deskew
+
+Correct even minor text rotation or tilt
+
+Smart resize
+
+Enlarge small text while preserving aspect ratio
+
+Morphological operations
+
+Closing → reconnect broken Arabic letters
+
+Opening → separate overly merged text
+
+⚠️ OCR MUST NEVER be applied to the original image.
+Only the processed image is allowed.
+
+🔍 PHASE 2 — OCR (EXTRACTION ONLY)
+
+Run OCR with the following strict rules:
+
+Language: Arabic + English
+
+OCR role: Text extraction only
+
+Do NOT attempt understanding or explanation at this stage
+
+The OCR output is expected to be raw and imperfect.
+
+🧠 PHASE 3 — ARABIC OCR CORRECTION & NORMALIZATION (CRITICAL)
+
+After OCR, send the extracted text to the LLM using the following instruction:
+
+📌 Arabic OCR Correction Instruction
+
+You are a language system specialized in correcting Arabic text extracted from OCR.
+
+The text may contain:
+
+Broken or corrupted characters (e.g. ��)
+
+Misspelled words
+
+Incorrect spacing
+
+Joined or split words
+
+Confusion between similar Arabic letters (ي/ى، ه/ة، ب/ت/ث، ل/ﻻ)
+
+Your task:
+
+Correct spelling and character errors only.
+
+Rewrite the text in clear, correct Modern Standard Arabic.
+
+Do NOT change the original meaning.
+
+Do NOT add new information.
+
+Preserve the original structure and intent.
+
+Remove unreadable symbols or replace them contextually.
+
+Output requirements:
+
+Clean, readable Arabic text
+
+Suitable for direct display to users or further analysis
+
+Raw OCR text:
+
+{{OCR_TEXT}}
+
+🧱 SYSTEM RULES
+
+Vision (preprocessing + OCR) and language understanding MUST remain separated
+
+OCR extracts text only
+
+The LLM corrects language only
+
+No external paid vision APIs
+
+Must be production-ready and stable
+
+✅ EXPECTED RESULT
+
+After this pipeline:
+
+Arabic text is readable and professional
+
+Broken characters are eliminated
+
+OCR errors are significantly reduced
+
+The system feels intelligent, not mechanical
+
+🧠 FINAL NOTE
+
+This pipeline is mandatory for any serious Arabic OCR system.
+Skipping preprocessing or correction will result in poor quality output.
+
+Implement accordingly.
