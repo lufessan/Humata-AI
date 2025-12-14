@@ -54,8 +54,8 @@ export function SpaceBackground() {
       }
     }
 
-    // Initialize planets
-    if (planetsRef.current.length === 0) {
+    // Initialize planets - skip entirely on mobile for performance
+    if (!isMobile && planetsRef.current.length === 0) {
       planetsRef.current = [
         { x: canvas.width * 0.15, y: canvas.height * 0.3, radius: 40, color: '#FF6B6B', speed: 0.0002 },
         { x: canvas.width * 0.85, y: canvas.height * 0.7, radius: 60, color: '#4ECDC4', speed: 0.0001 },

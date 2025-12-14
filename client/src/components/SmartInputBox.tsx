@@ -20,6 +20,7 @@ import {
   Upload,
   Loader2,
   X,
+  Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -104,10 +105,19 @@ export function SmartInputBox({
   const [studyOpen, setStudyOpen] = useState(false);
   const [assessmentOpen, setAssessmentOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isRTL = language === "ar";
   const hasInitializedPersona = useRef(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Determine which icon groups to show based on context
   const showLearningMode = context === "chat" || context === "dashboard";
@@ -351,213 +361,343 @@ export function SmartInputBox({
         />
 
         <div className={cn("flex items-center gap-0.5 py-1", isRTL ? "order-first" : "order-last")}>
-          {showLearningMode && (
-            <Popover open={learningOpen} onOpenChange={setLearningOpen}>
+          {isMobile ? (
+            <Popover open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <PopoverTrigger asChild>
                 <div>
                   <PopoverButton
-                    tooltip={t.learningMode}
-                    isActive={settings.learningMode !== "auto"}
-                    data-testid="btn-learning-mode"
+                    tooltip={language === "ar" ? "القائمة" : "Menu"}
+                    isActive={settings.learningMode !== "auto" || settings.studyTool !== null || settings.assessment !== null || settings.difficulty !== 50 || !settings.memoryEnabled}
+                    data-testid="btn-mobile-menu"
                   >
-                    {getLearningModeIcon()}
+                    <Menu className="w-4 h-4" />
                   </PopoverButton>
                 </div>
               </PopoverTrigger>
               <PopoverContent
-                className="w-44 p-2"
-                side={isRTL ? "left" : "right"}
-                align="start"
-              >
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{t.learningMode}</p>
-                  <PopoverItem
-                    icon={<Wand2 className="w-4 h-4" />}
-                    label={t.auto}
-                    isSelected={settings.learningMode === "auto"}
-                    onClick={() => {
-                      updateSetting("learningMode", "auto");
-                      setLearningOpen(false);
-                    }}
-                  />
-                  <PopoverItem
-                    icon={<GraduationCap className="w-4 h-4" />}
-                    label={t.student}
-                    isSelected={settings.learningMode === "student"}
-                    onClick={() => {
-                      updateSetting("learningMode", "student");
-                      setLearningOpen(false);
-                    }}
-                  />
-                  <PopoverItem
-                    icon={<School className="w-4 h-4" />}
-                    label={t.teacher}
-                    isSelected={settings.learningMode === "teacher"}
-                    onClick={() => {
-                      updateSetting("learningMode", "teacher");
-                      setLearningOpen(false);
-                    }}
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-
-          {showStudyTools && (
-            <Popover open={studyOpen} onOpenChange={setStudyOpen}>
-            <PopoverTrigger asChild>
-              <div>
-                <PopoverButton
-                  tooltip={t.studyTools}
-                  isActive={settings.studyTool !== null}
-                  data-testid="btn-study-tools"
-                >
-                  {getStudyToolIcon()}
-                </PopoverButton>
-              </div>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-48 p-2"
-              side={isRTL ? "left" : "right"}
-              align="start"
-            >
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{t.studyTools}</p>
-                <PopoverItem
-                  icon={<BookOpen className="w-4 h-4" />}
-                  label={t.pack}
-                  isSelected={settings.studyTool === "pack"}
-                  onClick={() => {
-                    updateSetting("studyTool", settings.studyTool === "pack" ? null : "pack");
-                    setStudyOpen(false);
-                  }}
-                />
-                <PopoverItem
-                  icon={<ImagePlus className="w-4 h-4" />}
-                  label={t.image}
-                  isSelected={settings.studyTool === "image"}
-                  onClick={() => {
-                    updateSetting("studyTool", settings.studyTool === "image" ? null : "image");
-                    setStudyOpen(false);
-                  }}
-                />
-                <PopoverItem
-                  icon={<Lightbulb className="w-4 h-4" />}
-                  label={t.explain}
-                  isSelected={settings.studyTool === "explain"}
-                  onClick={() => {
-                    updateSetting("studyTool", settings.studyTool === "explain" ? null : "explain");
-                    setStudyOpen(false);
-                  }}
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
-          )}
-
-          {showAssessment && (
-            <Popover open={assessmentOpen} onOpenChange={setAssessmentOpen}>
-              <PopoverTrigger asChild>
-                <div>
-                  <PopoverButton
-                    tooltip={t.assessment}
-                    isActive={settings.assessment !== null}
-                    data-testid="btn-assessment"
-                  >
-                    {getAssessmentIcon()}
-                  </PopoverButton>
-                </div>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-48 p-2"
-                side={isRTL ? "left" : "right"}
-                align="start"
-              >
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{t.assessment}</p>
-                  <PopoverItem
-                    icon={<ClipboardCheck className="w-4 h-4" />}
-                    label={t.exam}
-                    isSelected={settings.assessment === "exam"}
-                    onClick={() => {
-                      updateSetting("assessment", settings.assessment === "exam" ? null : "exam");
-                      setAssessmentOpen(false);
-                    }}
-                  />
-                  <PopoverItem
-                    icon={<HelpCircle className="w-4 h-4" />}
-                    label={t.whyWrong}
-                    isSelected={settings.assessment === "whyWrong"}
-                    onClick={() => {
-                      updateSetting("assessment", settings.assessment === "whyWrong" ? null : "whyWrong");
-                      setAssessmentOpen(false);
-                    }}
-                  />
-                  <PopoverItem
-                    icon={<BarChart2 className="w-4 h-4" />}
-                    label={t.insights}
-                    isSelected={settings.assessment === "insights"}
-                    onClick={() => {
-                      updateSetting("assessment", settings.assessment === "insights" ? null : "insights");
-                      setAssessmentOpen(false);
-                    }}
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-
-          {showOptions && (
-            <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>
-              <PopoverTrigger asChild>
-                <div>
-                  <PopoverButton
-                    tooltip={t.options}
-                    isActive={settings.difficulty !== 50 || !settings.memoryEnabled}
-                    data-testid="btn-options"
-                  >
-                    <SlidersHorizontal className="w-4 h-4" />
-                  </PopoverButton>
-                </div>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-56 p-3"
-                side={isRTL ? "left" : "right"}
-                align="start"
+                className="w-64 p-3 max-h-80 overflow-y-auto"
+                side="top"
+                align="center"
               >
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm flex items-center gap-1.5">
-                        <SlidersHorizontal className="w-3.5 h-3.5" />
-                        {t.difficulty}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{settings.difficulty}%</span>
+                  {showLearningMode && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{t.learningMode}</p>
+                      <PopoverItem
+                        icon={<Wand2 className="w-4 h-4" />}
+                        label={t.auto}
+                        isSelected={settings.learningMode === "auto"}
+                        onClick={() => updateSetting("learningMode", "auto")}
+                      />
+                      <PopoverItem
+                        icon={<GraduationCap className="w-4 h-4" />}
+                        label={t.student}
+                        isSelected={settings.learningMode === "student"}
+                        onClick={() => updateSetting("learningMode", "student")}
+                      />
+                      <PopoverItem
+                        icon={<School className="w-4 h-4" />}
+                        label={t.teacher}
+                        isSelected={settings.learningMode === "teacher"}
+                        onClick={() => updateSetting("learningMode", "teacher")}
+                      />
                     </div>
-                    <Slider
-                      value={[settings.difficulty]}
-                      onValueChange={([val]) => updateSetting("difficulty", val)}
-                      max={100}
-                      step={10}
-                      className="w-full"
-                      data-testid="slider-difficulty"
-                    />
-                  </div>
+                  )}
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm flex items-center gap-1.5">
-                      <Brain className="w-3.5 h-3.5" />
-                      {t.memory}
-                    </span>
-                    <Switch
-                      checked={settings.memoryEnabled}
-                      onCheckedChange={(checked) => updateSetting("memoryEnabled", checked)}
-                      data-testid="switch-memory"
-                    />
-                  </div>
+                  {showStudyTools && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{t.studyTools}</p>
+                      <PopoverItem
+                        icon={<BookOpen className="w-4 h-4" />}
+                        label={t.pack}
+                        isSelected={settings.studyTool === "pack"}
+                        onClick={() => updateSetting("studyTool", settings.studyTool === "pack" ? null : "pack")}
+                      />
+                      <PopoverItem
+                        icon={<ImagePlus className="w-4 h-4" />}
+                        label={t.image}
+                        isSelected={settings.studyTool === "image"}
+                        onClick={() => updateSetting("studyTool", settings.studyTool === "image" ? null : "image")}
+                      />
+                      <PopoverItem
+                        icon={<Lightbulb className="w-4 h-4" />}
+                        label={t.explain}
+                        isSelected={settings.studyTool === "explain"}
+                        onClick={() => updateSetting("studyTool", settings.studyTool === "explain" ? null : "explain")}
+                      />
+                    </div>
+                  )}
+
+                  {showAssessment && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{t.assessment}</p>
+                      <PopoverItem
+                        icon={<ClipboardCheck className="w-4 h-4" />}
+                        label={t.exam}
+                        isSelected={settings.assessment === "exam"}
+                        onClick={() => updateSetting("assessment", settings.assessment === "exam" ? null : "exam")}
+                      />
+                      <PopoverItem
+                        icon={<HelpCircle className="w-4 h-4" />}
+                        label={t.whyWrong}
+                        isSelected={settings.assessment === "whyWrong"}
+                        onClick={() => updateSetting("assessment", settings.assessment === "whyWrong" ? null : "whyWrong")}
+                      />
+                      <PopoverItem
+                        icon={<BarChart2 className="w-4 h-4" />}
+                        label={t.insights}
+                        isSelected={settings.assessment === "insights"}
+                        onClick={() => updateSetting("assessment", settings.assessment === "insights" ? null : "insights")}
+                      />
+                    </div>
+                  )}
+
+                  {showOptions && (
+                    <div className="space-y-3 pt-2 border-t border-border">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm flex items-center gap-1.5">
+                            <SlidersHorizontal className="w-3.5 h-3.5" />
+                            {t.difficulty}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{settings.difficulty}%</span>
+                        </div>
+                        <Slider
+                          value={[settings.difficulty]}
+                          onValueChange={([val]) => updateSetting("difficulty", val)}
+                          max={100}
+                          step={10}
+                          className="w-full"
+                          data-testid="slider-difficulty-mobile"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm flex items-center gap-1.5">
+                          <Brain className="w-3.5 h-3.5" />
+                          {t.memory}
+                        </span>
+                        <Switch
+                          checked={settings.memoryEnabled}
+                          onCheckedChange={(checked) => updateSetting("memoryEnabled", checked)}
+                          data-testid="switch-memory-mobile"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
+          ) : (
+            <>
+              {showLearningMode && (
+                <Popover open={learningOpen} onOpenChange={setLearningOpen}>
+                  <PopoverTrigger asChild>
+                    <div>
+                      <PopoverButton
+                        tooltip={t.learningMode}
+                        isActive={settings.learningMode !== "auto"}
+                        data-testid="btn-learning-mode"
+                      >
+                        {getLearningModeIcon()}
+                      </PopoverButton>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-44 p-2"
+                    side={isRTL ? "left" : "right"}
+                    align="start"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{t.learningMode}</p>
+                      <PopoverItem
+                        icon={<Wand2 className="w-4 h-4" />}
+                        label={t.auto}
+                        isSelected={settings.learningMode === "auto"}
+                        onClick={() => {
+                          updateSetting("learningMode", "auto");
+                          setLearningOpen(false);
+                        }}
+                      />
+                      <PopoverItem
+                        icon={<GraduationCap className="w-4 h-4" />}
+                        label={t.student}
+                        isSelected={settings.learningMode === "student"}
+                        onClick={() => {
+                          updateSetting("learningMode", "student");
+                          setLearningOpen(false);
+                        }}
+                      />
+                      <PopoverItem
+                        icon={<School className="w-4 h-4" />}
+                        label={t.teacher}
+                        isSelected={settings.learningMode === "teacher"}
+                        onClick={() => {
+                          updateSetting("learningMode", "teacher");
+                          setLearningOpen(false);
+                        }}
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+
+              {showStudyTools && (
+                <Popover open={studyOpen} onOpenChange={setStudyOpen}>
+                <PopoverTrigger asChild>
+                  <div>
+                    <PopoverButton
+                      tooltip={t.studyTools}
+                      isActive={settings.studyTool !== null}
+                      data-testid="btn-study-tools"
+                    >
+                      {getStudyToolIcon()}
+                    </PopoverButton>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-48 p-2"
+                  side={isRTL ? "left" : "right"}
+                  align="start"
+                >
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{t.studyTools}</p>
+                    <PopoverItem
+                      icon={<BookOpen className="w-4 h-4" />}
+                      label={t.pack}
+                      isSelected={settings.studyTool === "pack"}
+                      onClick={() => {
+                        updateSetting("studyTool", settings.studyTool === "pack" ? null : "pack");
+                        setStudyOpen(false);
+                      }}
+                    />
+                    <PopoverItem
+                      icon={<ImagePlus className="w-4 h-4" />}
+                      label={t.image}
+                      isSelected={settings.studyTool === "image"}
+                      onClick={() => {
+                        updateSetting("studyTool", settings.studyTool === "image" ? null : "image");
+                        setStudyOpen(false);
+                      }}
+                    />
+                    <PopoverItem
+                      icon={<Lightbulb className="w-4 h-4" />}
+                      label={t.explain}
+                      isSelected={settings.studyTool === "explain"}
+                      onClick={() => {
+                        updateSetting("studyTool", settings.studyTool === "explain" ? null : "explain");
+                        setStudyOpen(false);
+                      }}
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
+              )}
+
+              {showAssessment && (
+                <Popover open={assessmentOpen} onOpenChange={setAssessmentOpen}>
+                  <PopoverTrigger asChild>
+                    <div>
+                      <PopoverButton
+                        tooltip={t.assessment}
+                        isActive={settings.assessment !== null}
+                        data-testid="btn-assessment"
+                      >
+                        {getAssessmentIcon()}
+                      </PopoverButton>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-48 p-2"
+                    side={isRTL ? "left" : "right"}
+                    align="start"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{t.assessment}</p>
+                      <PopoverItem
+                        icon={<ClipboardCheck className="w-4 h-4" />}
+                        label={t.exam}
+                        isSelected={settings.assessment === "exam"}
+                        onClick={() => {
+                          updateSetting("assessment", settings.assessment === "exam" ? null : "exam");
+                          setAssessmentOpen(false);
+                        }}
+                      />
+                      <PopoverItem
+                        icon={<HelpCircle className="w-4 h-4" />}
+                        label={t.whyWrong}
+                        isSelected={settings.assessment === "whyWrong"}
+                        onClick={() => {
+                          updateSetting("assessment", settings.assessment === "whyWrong" ? null : "whyWrong");
+                          setAssessmentOpen(false);
+                        }}
+                      />
+                      <PopoverItem
+                        icon={<BarChart2 className="w-4 h-4" />}
+                        label={t.insights}
+                        isSelected={settings.assessment === "insights"}
+                        onClick={() => {
+                          updateSetting("assessment", settings.assessment === "insights" ? null : "insights");
+                          setAssessmentOpen(false);
+                        }}
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+
+              {showOptions && (
+                <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>
+                  <PopoverTrigger asChild>
+                    <div>
+                      <PopoverButton
+                        tooltip={t.options}
+                        isActive={settings.difficulty !== 50 || !settings.memoryEnabled}
+                        data-testid="btn-options"
+                      >
+                        <SlidersHorizontal className="w-4 h-4" />
+                      </PopoverButton>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-56 p-3"
+                    side={isRTL ? "left" : "right"}
+                    align="start"
+                  >
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm flex items-center gap-1.5">
+                            <SlidersHorizontal className="w-3.5 h-3.5" />
+                            {t.difficulty}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{settings.difficulty}%</span>
+                        </div>
+                        <Slider
+                          value={[settings.difficulty]}
+                          onValueChange={([val]) => updateSetting("difficulty", val)}
+                          max={100}
+                          step={10}
+                          className="w-full"
+                          data-testid="slider-difficulty"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm flex items-center gap-1.5">
+                          <Brain className="w-3.5 h-3.5" />
+                          {t.memory}
+                        </span>
+                        <Switch
+                          checked={settings.memoryEnabled}
+                          onCheckedChange={(checked) => updateSetting("memoryEnabled", checked)}
+                          data-testid="switch-memory"
+                        />
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </>
           )}
 
           {onFileUpload && (
