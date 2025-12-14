@@ -1,0 +1,148 @@
+FINAL EXECUTION & VALIDATION DIRECTIVE (USE REMAINING 11%)
+
+This is the final execution phase.
+Do NOT assume completion until all items below are implemented, tested, and verified.
+
+Do NOT add new features.
+Only complete, harden, and validate what already exists.
+
+🔴 1. GROQ_API_KEY — FINAL CHECK
+
+Confirm GROQ_API_KEY is:
+
+Required
+
+Clearly validated on startup
+
+If missing:
+
+Show a clear, user-readable error
+
+Do NOT crash silently
+
+Confirm all AI features depend correctly on this key.
+
+🔴 2. MOBILE DRAGGABLE FLOATING CONTROLS — FINAL HARDENING
+
+The draggable mobile floating controls are implemented, but must now be finalized and hardened.
+
+Required confirmations & adjustments:
+
+Persistence
+
+Save the floating control position using localStorage
+
+Position must persist after:
+
+Page reload
+
+Tab close & reopen
+
+Mobile-only enforcement
+
+Dragging must be enabled ONLY on mobile viewports
+
+Explicitly disable drag on:
+
+Desktop
+
+Tablets / large screens
+
+Use reliable viewport detection (not assumptions)
+
+UX safety
+
+Dragging must NOT:
+
+Trigger clicks
+
+Block scrolling
+
+Obscure critical content
+
+Control must remain inside screen bounds at all times
+
+Interaction quality
+
+Smooth touch drag
+
+Clear visual feedback while dragging
+
+Snap safely within viewport limits
+
+🔴 3. FULL SYSTEM VALIDATION (MANDATORY)
+
+Before marking this task complete, you MUST personally test and verify:
+
+👁️ Vision System
+
+OCR on:
+
+Image with dark background / glow
+
+Scanned PDF
+
+Confirm:
+
+Preprocessing is applied
+
+Arabic output is readable and clean
+
+🧠 Brain System
+
+Groq LLM responds correctly
+
+Student mode:
+
+Simplified explanations
+
+Teacher mode:
+
+Question generation works
+
+📂 File Handling
+
+Multi-file upload works
+
+Smart merging produces one coherent text
+
+No duplicated headers or broken sentences
+
+📱 Mobile UX Testing
+
+Test on:
+
+Android
+
+iOS
+
+Verify:
+
+Drag + scroll works smoothly
+
+Floating controls behave correctly
+
+No layout breakage
+
+🔴 4. FINAL CHECKLIST (REQUIRED OUTPUT)
+
+Before you stop, provide a final checklist confirming:
+
+All features implemented ✔️
+
+All features tested ✔️
+
+No partial or placeholder logic ✔️
+
+Mobile draggable controls fully validated ✔️
+
+System is production-ready ✔️
+
+Do NOT conclude with “it works”.
+Conclude only with “verified and validated”.
+
+🧠 FINAL INSTRUCTION
+
+This is the last pass.
+Use the remaining quota efficiently.
+Finish cleanly and decisively.

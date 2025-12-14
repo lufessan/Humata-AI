@@ -39,7 +39,7 @@ export function FloatingNavBar({ isSidebarOpen = false, onToggleSidebar, isOnCha
       setIsMobile(mobile);
       
       if (mobile) {
-        const savedPosition = sessionStorage.getItem(STORAGE_KEY);
+        const savedPosition = localStorage.getItem(STORAGE_KEY);
         if (savedPosition) {
           try {
             const parsed = JSON.parse(savedPosition);
@@ -68,7 +68,7 @@ export function FloatingNavBar({ isSidebarOpen = false, onToggleSidebar, isOnCha
   }, []);
 
   const savePosition = useCallback((pos: Position) => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {

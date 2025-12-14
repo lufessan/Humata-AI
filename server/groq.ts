@@ -11,12 +11,26 @@ const pdfParse = require("pdf-parse");
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const REASONING_MODEL = "llama-3.3-70b-versatile";
 
-if (!GROQ_API_KEY) {
-  console.error("[Groq] CRITICAL: No GROQ_API_KEY environment variable is set!");
-} else {
-  console.log(`[Groq] API key configured, using model: ${REASONING_MODEL} (reasoning)`);
+function validateGroqApiKey(): void {
+  if (!GROQ_API_KEY) {
+    console.error("╔════════════════════════════════════════════════════════════════╗");
+    console.error("║  [Groq] CRITICAL ERROR: GROQ_API_KEY is not configured!        ║");
+    console.error("║                                                                ║");
+    console.error("║  The AI features will NOT work without a valid API key.        ║");
+    console.error("║  Please set the GROQ_API_KEY environment variable.             ║");
+    console.error("║                                                                ║");
+    console.error("║  To fix this:                                                  ║");
+    console.error("║  1. Get an API key from https://console.groq.com               ║");
+    console.error("║  2. Add GROQ_API_KEY to your environment secrets               ║");
+    console.error("╚════════════════════════════════════════════════════════════════╝");
+  } else {
+    const maskedKey = GROQ_API_KEY.slice(0, 8) + "..." + GROQ_API_KEY.slice(-4);
+    console.log(`[Groq] API key validated successfully (${maskedKey})`);
+    console.log(`[Groq] Using model: ${REASONING_MODEL}`);
+  }
 }
 
+validateGroqApiKey();
 console.log("[OCR] Enhanced Arabic OCR pipeline with Sharp preprocessing + Tesseract.js + LLM correction");
 
 const groq = new Groq({
