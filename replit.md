@@ -1,25 +1,27 @@
 # HUMATA AI - Cyberpunk Vision AI Console
 
 ## Overview
-A fully Arabic-localized cyberpunk-themed web application powered by Google's Gemini 2.5 Pro with multimodal capabilities. Features 8 specialized AI modules with stunning neon UI, complete RTL support, file upload capabilities, and clean AI output. Credited to "المبرمج محمود عادل" (Programmer: Mahmoud Adel).
+A fully Arabic-localized cyberpunk-themed web application powered by Groq LLM with local Tesseract.js OCR capabilities. Features 8 specialized AI modules with stunning neon UI, complete RTL support, file upload capabilities, and clean AI output. Credited to "المبرمج محمود عادل" (Programmer: Mahmoud Adel).
 
 ## Status: ✅ FULLY COMPLETE (8 Modules)
 Application is production-ready with all 8 primary modules fully integrated and tested.
 
+## AI Stack (No Google Dependencies)
+- **LLM**: Groq (llama-3.3-70b-versatile) - Fast inference
+- **OCR**: Tesseract.js (local, no external API calls)
+- **File Parsing**: pdf-parse, mammoth (local processing)
+- **NO Google Vision, NO Gemini, NO external vision APIs**
+
 ## Recent Changes
+- **December 14, 2025**: Complete Google Vision/Gemini Removal
+  - Removed all Gemini API dependencies
+  - Switched to Groq LLM for text processing
+  - Using Tesseract.js for local OCR (no API calls)
+  - Ready for Render Free deployment
 - **December 13, 2025**: Persona-Based Conversation Filtering
   - Added persona column to conversations table in database
   - Conversations are now saved and filtered by persona/section
   - Each module shows only its own conversations in the sidebar
-  - Hybrid AI system: Google Gemini 1.5 Pro (vision) + Groq Llama 3.3 70B (reasoning)
-- **November 30, 2025**: Final Completion
-  - Added 8th module: "المساعد العلمي" (Scientific Assistant) with Math/Physics/Chemistry/Arabic support
-  - Implemented comprehensive error handling with Arabic messages
-  - Enhanced error display for API quota limits with user-friendly notifications
-  - Full file upload + URL input support for Doctor and Scientific Assistant modules
-  - Auto-grounding enabled for Research, Doctor, and Scientific Assistant modules
-  - Fullscreen Kiira AI iframe for AI Image Generation
-  - Quiz settings panel with custom configurations (questions count, type, difficulty)
 
 ## Project Architecture
 
@@ -34,9 +36,10 @@ Application is production-ready with all 8 primary modules fully integrated and 
 
 ### Backend (server/)
 - **Framework**: Express.js with TypeScript
-- **AI Integration**: Google Gemini 2.5 Pro API with web search (grounding)
+- **AI Integration**: Groq API (llama-3.3-70b-versatile)
+- **OCR**: Tesseract.js (local processing, no external API)
 - **File Upload**: Multer for image/PDF processing
-- **Storage**: In-memory session storage
+- **Storage**: PostgreSQL with Drizzle ORM
 - **Error Handling**: Comprehensive API error handling with user-friendly Arabic messages
 
 ### Key Files
@@ -45,7 +48,7 @@ Application is production-ready with all 8 primary modules fully integrated and 
 - `client/src/lib/appContext.ts` - Global app state and language management
 - `client/src/lib/translations.ts` - Complete Arabic/English translation dictionary
 - `server/routes.ts` - All API endpoints with error handling
-- `server/gemini.ts` - Gemini 2.5 Pro integration service
+- `server/groq.ts` - Groq LLM + Tesseract.js OCR integration
 - `shared/schema.ts` - TypeScript type definitions
 
 ## API Endpoints
@@ -56,7 +59,7 @@ Application is production-ready with all 8 primary modules fully integrated and 
 - `GET /api/conversations/:id` - Fetch specific conversation messages
 
 ## Environment Variables
-- `GEMINI_API_KEY` - Google Gemini 2.5 Pro API key (required)
+- `GROQ_API_KEY` - Groq API key (required for LLM)
 - `SESSION_SECRET` - JWT session encryption key
 - Database variables (PostgreSQL): `DATABASE_URL`, `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`
 
@@ -94,7 +97,7 @@ Application runs on `0.0.0.0:5000` with automatic hot reload.
 - Auto-grounding + PubMed/Google Scholar
 - File + URL support for document analysis
 
-### 4. **توليد الصور** (Image Generation/Search)
+### 4. **توليد الصور** (Image Search)
 - Search images from Wikimedia Commons
 - Icon: Image (Yellow glow)
 - Returns structured JSON image URLs
@@ -128,11 +131,11 @@ Application runs on `0.0.0.0:5000` with automatic hot reload.
 
 ## System Prompts & Intelligence
 - Each module has specialized system instructions
-- Gemini 2.5 Pro is configured with:
-  - Technical transparency instruction (reveal model name)
+- Groq LLM (llama-3.3-70b-versatile) configured with:
+  - Technical transparency instruction
   - Clean output requirement (no Markdown)
-  - Web search capability (grounding) for Research/Doctor/Scientific Assistant
   - Custom domain expertise for each module
+- Tesseract.js for local OCR (Arabic + English)
 
 ## Localization Features
 - Full Arabic (RTL) and English (LTR) support
@@ -155,18 +158,15 @@ Application runs on `0.0.0.0:5000` with automatic hot reload.
 - Chat errors: Specific error types with contextual help
 
 ## Known Limitations
-- Gemini 2.5 Pro Free Tier: 50 requests/day limit
-- Image generation requires active internet
-- File uploads limited to images/PDFs
+- File uploads limited to images/PDFs/DOCX/TXT
 - Session storage: In-memory (lost on server restart)
+- OCR quality depends on image clarity
 
 ## Future Enhancements
-- PostgreSQL conversation persistence
 - User authentication/profiles
 - Conversation export (PDF/JSON)
 - Advanced file analysis (videos, audio)
 - Voice input/output capabilities
-- Custom model fine-tuning
 
 ## Testing Notes
 - All 8 modules fully functional
@@ -178,10 +178,12 @@ Application runs on `0.0.0.0:5000` with automatic hot reload.
 
 ## Credits
 **Programmer**: محمود عادل (Mahmoud Adel)  
-**Framework**: Google Gemini 2.5 Pro API  
+**LLM**: Groq (llama-3.3-70b-versatile)  
+**OCR**: Tesseract.js (local)  
 **UI Components**: Shadcn + Tailwind CSS  
-**Deployment**: Replit  
+**Deployment**: Replit / Render  
 
 ---
-Last Updated: November 30, 2025  
-Status: Production Ready ✅
+Last Updated: December 14, 2025  
+Status: Production Ready ✅  
+Note: Google Vision/Gemini completely removed - using Groq + local Tesseract.js only
