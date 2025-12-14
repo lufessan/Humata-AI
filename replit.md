@@ -16,6 +16,11 @@ Application is production-ready with all 8 primary modules fully integrated and 
 - **NO Google Vision, NO Gemini, NO external vision APIs**
 
 ## Recent Changes
+- **December 14, 2025**: Quiz Enhancements + Arabic PDF Heading Detection
+  - Quiz question limit increased from 50 to 100 questions per quiz
+  - Updated quiz system prompt for better balanced content coverage
+  - New API endpoint `/api/structure-text` for automatic heading detection from Arabic PDF text
+  - Returns structured JSON with sections (main/sub headings) and plain text
 - **December 14, 2025**: Multi-File Upload + Smart PDF Merging + UI Improvements
   - Multiple file uploads now supported (select multiple files at once)
   - Expanded file format support: PDF, images, DOC/DOCX, TXT, Markdown
