@@ -148,10 +148,15 @@ class GeminiKeyManager {
 
 const keyManager = new GeminiKeyManager();
 
-function getGeminiClient(): GoogleGenerativeAI | null {
+interface GeminiClientResult {
+  client: GoogleGenerativeAI;
+  key: string;
+}
+
+function getGeminiClient(): GeminiClientResult | null {
   const key = keyManager.getNextAvailableKey();
   if (!key) return null;
-  return new GoogleGenerativeAI(key);
+  return { client: new GoogleGenerativeAI(key), key };
 }
 
 export function getGeminiKeyStatus() {
@@ -167,10 +172,9 @@ export async function analyzeImageWithGemini(
   mimeType: string,
   customPrompt?: string
 ): Promise<string> {
-  const client = getGeminiClient();
-  const currentKey = keyManager.getNextAvailableKey();
+  const clientResult = getGeminiClient();
   
-  if (!client || !currentKey) {
+  if (!clientResult) {
     console.error("[Gemini] No available API keys");
     return `[تحليل الصورة]
 
@@ -178,6 +182,7 @@ export async function analyzeImageWithGemini(
 يرجى إضافة GEMINI_API_KEY إلى إعدادات البيئة للحصول على تحليل الصور والملفات.`;
   }
 
+  const { client, key } = clientResult;
   console.log(`[Gemini] Analyzing image with ${GEMINI_MODEL}`);
 
   const prompt = customPrompt || `أنت نظام ذكاء اصطناعي متخصص في قراءة وتحليل الصور والمستندات بدقة عالية.
@@ -217,16 +222,16 @@ export async function analyzeImageWithGemini(
     const response = result.response;
     const text = response.text();
 
-    keyManager.markKeySuccess(currentKey);
+    keyManager.markKeySuccess(key);
     console.log(`[Gemini] Analysis successful - ${text.length} chars`);
     
     return text;
   } catch (error: any) {
     console.error("[Gemini] Analysis error:", error.message);
-    keyManager.markKeyFailure(currentKey, error.message);
+    keyManager.markKeyFailure(key, error.message);
 
-    const retryKey = keyManager.getNextAvailableKey();
-    if (retryKey && retryKey !== currentKey) {
+    const retryResult = getGeminiClient();
+    if (retryResult && retryResult.key !== key) {
       console.log("[Gemini] Retrying with different key...");
       return analyzeImageWithGemini(base64Data, mimeType, customPrompt);
     }
@@ -240,16 +245,16 @@ export async function analyzeDocumentWithGemini(
   mimeType: string,
   fileName: string
 ): Promise<string> {
-  const client = getGeminiClient();
-  const currentKey = keyManager.getNextAvailableKey();
+  const clientResult = getGeminiClient();
   
-  if (!client || !currentKey) {
+  if (!clientResult) {
     console.error("[Gemini] No available API keys");
     return `[تحليل المستند: ${fileName}]
 
 عذراً، لم يتم تكوين مفتاح API لـ Gemini.`;
   }
 
+  const { client, key } = clientResult;
   console.log(`[Gemini] Analyzing document: ${fileName}`);
 
   const prompt = `أنت نظام متخصص في قراءة المستندات والملفات. اقرأ المستند التالي بدقة واستخرج كل المحتوى النصي منه.
@@ -285,13 +290,13 @@ export async function analyzeDocumentWithGemini(
     const response = result.response;
     const text = response.text();
 
-    keyManager.markKeySuccess(currentKey);
+    keyManager.markKeySuccess(key);
     console.log(`[Gemini] Document analysis successful - ${text.length} chars`);
     
     return text;
   } catch (error: any) {
     console.error("[Gemini] Document analysis error:", error.message);
-    keyManager.markKeyFailure(currentKey, error.message);
+    keyManager.markKeyFailure(key, error.message);
     throw new Error(`فشل في تحليل المستند: ${error.message}`);
   }
 }
