@@ -1,8 +1,102 @@
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { MessageSquare, HelpCircle, BookOpen, Image, CheckCircle, Sparkles, Stethoscope, Users, Landmark, Sun, Moon, Globe, Map } from "lucide-react";
+import { MessageSquare, HelpCircle, BookOpen, Image, CheckCircle, Sparkles, Stethoscope, Users, Landmark, Sun, Moon, Globe, Map, Snowflake } from "lucide-react";
 import { useAppContext } from "@/lib/appContext";
 import { t } from "@/lib/translations";
 import { Button } from "@/components/ui/button";
+
+// Snow effect component
+function SnowEffect({ isActive }: { isActive: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const snowflakesRef = useRef<Array<{x: number; y: number; radius: number; speed: number; opacity: number; swing: number; swingSpeed: number}>>([]);
+  const animationRef = useRef<number>();
+
+  useEffect(() => {
+    if (!isActive) {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Initialize snowflakes
+    const snowCount = Math.min(150, Math.floor(window.innerWidth / 8));
+    snowflakesRef.current = [];
+    for (let i = 0; i < snowCount; i++) {
+      snowflakesRef.current.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: Math.random() * 3 + 1,
+        speed: Math.random() * 2 + 0.5,
+        opacity: Math.random() * 0.7 + 0.3,
+        swing: Math.random() * Math.PI * 2,
+        swingSpeed: Math.random() * 0.02 + 0.01,
+      });
+    }
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      snowflakesRef.current.forEach((flake) => {
+        flake.y += flake.speed;
+        flake.swing += flake.swingSpeed;
+        flake.x += Math.sin(flake.swing) * 0.5;
+
+        if (flake.y > canvas.height) {
+          flake.y = -10;
+          flake.x = Math.random() * canvas.width;
+        }
+        if (flake.x > canvas.width) flake.x = 0;
+        if (flake.x < 0) flake.x = canvas.width;
+
+        ctx.beginPath();
+        ctx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${flake.opacity})`;
+        ctx.fill();
+
+        // Add a subtle glow effect
+        ctx.beginPath();
+        ctx.arc(flake.x, flake.y, flake.radius * 2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(200, 230, 255, ${flake.opacity * 0.2})`;
+        ctx.fill();
+      });
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isActive]);
+
+  if (!isActive) return null;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none z-50"
+      style={{ background: 'transparent' }}
+    />
+  );
+}
 
 function FeatureCardComponent({ feature }: any) {
   const IconComponent = feature.icon;
@@ -40,6 +134,7 @@ function FeatureCardComponent({ feature }: any) {
 
 export default function Hub() {
   const { language, theme, setLanguage, setTheme } = useAppContext();
+  const [isSnowing, setIsSnowing] = useState(false);
 
   const featureKeys = [
     { id: "chat", titleKey: "feature.chat", descKey: "feature.chat.desc", icon: MessageSquare, route: "/chat", glowColor: "cyan" },
@@ -181,7 +276,7 @@ export default function Hub() {
         {/* Footer - Programmer Credit */}
         <footer className="mt-auto py-8 px-3 text-center border-t border-foreground/10">
           <p 
-            className="text-base sm:text-lg text-foreground/70 animate-neon-glow"
+            className="text-base sm:text-lg text-foreground/70 animate-neon-glow mb-6"
             style={{ 
               fontFamily: "'Cairo', sans-serif", 
               fontWeight: 600,
@@ -201,8 +296,29 @@ export default function Hub() {
               : "This website was programmed by Mahmoud Adel"
             }
           </p>
+          
+          {/* Let it Snow Button */}
+          <Button
+            onClick={() => setIsSnowing(!isSnowing)}
+            variant="outline"
+            className="gap-2"
+            style={{
+              borderColor: isSnowing ? "#00F0FF" : "rgba(255, 255, 255, 0.3)",
+              color: isSnowing ? "#00F0FF" : "rgba(255, 255, 255, 0.8)",
+              backgroundColor: isSnowing ? "rgba(0, 240, 255, 0.1)" : "transparent",
+              boxShadow: isSnowing ? "0 0 15px rgba(0, 240, 255, 0.4), 0 0 30px rgba(0, 240, 255, 0.2)" : "none",
+              transition: "all 0.3s ease",
+            }}
+            data-testid="button-let-it-snow"
+          >
+            <Snowflake className="w-4 h-4" />
+            {isSnowing ? (language === "ar" ? "إيقاف الثلج" : "Stop Snow") : "Let it Snow"}
+          </Button>
         </footer>
       </div>
+      
+      {/* Snow Effect Overlay */}
+      <SnowEffect isActive={isSnowing} />
     </div>
   );
 }
