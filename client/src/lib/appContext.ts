@@ -22,6 +22,8 @@ export interface AppContextType {
   setShowAuthModal: (show: boolean) => void;
   isLogin: boolean;
   setIsLogin: (isLogin: boolean) => void;
+  isSnowing: boolean;
+  setIsSnowing: (snowing: boolean) => void;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
