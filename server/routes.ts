@@ -676,16 +676,18 @@ export async function registerRoutes(
   // API Key Status Endpoint - shows how many keys are available
   app.get("/api/keys/status", (req: Request, res: Response) => {
     const status = getApiKeyStatus();
+    const totalKeys = status.groq.total + status.gemini.total;
+    const availableKeys = status.groq.available + status.gemini.available;
     res.json({
       success: true,
       keys: {
-        total: status.total,
-        available: status.available,
-        failed: status.failed
+        groq: status.groq,
+        gemini: status.gemini,
+        hasImageAnalysis: status.hasImageAnalysis
       },
-      message: status.total === 0 
+      message: totalKeys === 0 
         ? "لم يتم إضافة أي مفاتيح API" 
-        : `${status.available} مفتاح متاح من ${status.total}`
+        : `${availableKeys} مفتاح متاح من ${totalKeys}`
     });
   });
 
