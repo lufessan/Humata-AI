@@ -5,11 +5,12 @@ import { useAppContext } from "@/lib/appContext";
 import { t } from "@/lib/translations";
 import { Button } from "@/components/ui/button";
 
-// Snow effect component - optimized for performance
+// Snow effect component - optimized for smooth consistent speed
 function SnowEffect({ isActive }: { isActive: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const snowflakesRef = useRef<Array<{x: number; y: number; size: number; speed: number; opacity: number; drift: number}>>([]);
   const animationRef = useRef<number>();
+  const lastTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isActive) {
@@ -18,6 +19,7 @@ function SnowEffect({ isActive }: { isActive: boolean }) {
         animationRef.current = undefined;
       }
       snowflakesRef.current = [];
+      lastTimeRef.current = 0;
       return;
     }
 
@@ -28,62 +30,61 @@ function SnowEffect({ isActive }: { isActive: boolean }) {
     if (!ctx) return;
 
     const isMobile = window.innerWidth < 768;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
     
     const resizeCanvas = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      canvas.style.width = window.innerWidth + 'px';
-      canvas.style.height = window.innerHeight + 'px';
-      ctx.scale(dpr, dpr);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
     };
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
     // Reduce particles on mobile for better performance
-    const snowCount = isMobile ? 40 : 60;
+    const snowCount = isMobile ? 35 : 50;
     snowflakesRef.current = [];
     
     for (let i = 0; i < snowCount; i++) {
       snowflakesRef.current.push({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
+        x: Math.random() * width,
+        y: Math.random() * height,
         size: Math.random() * 3 + 2,
-        speed: Math.random() * 3 + 2,
+        speed: Math.random() * 150 + 100,
         opacity: Math.random() * 0.6 + 0.4,
-        drift: Math.random() * 0.5 - 0.25,
+        drift: Math.random() * 30 - 15,
       });
     }
 
-    let lastTime = 0;
-    const targetFPS = isMobile ? 30 : 60;
-    const frameInterval = 1000 / targetFPS;
-
     const animate = (currentTime: number) => {
-      animationRef.current = requestAnimationFrame(animate);
+      if (lastTimeRef.current === 0) {
+        lastTimeRef.current = currentTime;
+      }
       
-      const deltaTime = currentTime - lastTime;
-      if (deltaTime < frameInterval) return;
-      lastTime = currentTime - (deltaTime % frameInterval);
+      const deltaTime = (currentTime - lastTimeRef.current) / 1000;
+      lastTimeRef.current = currentTime;
 
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      ctx.clearRect(0, 0, width, height);
 
       snowflakesRef.current.forEach((flake) => {
-        flake.y += flake.speed;
-        flake.x += flake.drift;
+        flake.y += flake.speed * deltaTime;
+        flake.x += flake.drift * deltaTime;
 
-        if (flake.y > window.innerHeight) {
+        if (flake.y > height) {
           flake.y = -10;
-          flake.x = Math.random() * window.innerWidth;
+          flake.x = Math.random() * width;
         }
-        if (flake.x > window.innerWidth) flake.x = 0;
-        if (flake.x < 0) flake.x = window.innerWidth;
+        if (flake.x > width) flake.x = 0;
+        if (flake.x < 0) flake.x = width;
 
         ctx.beginPath();
         ctx.arc(flake.x, flake.y, flake.size, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255, 255, 255, ${flake.opacity})`;
         ctx.fill();
       });
+
+      animationRef.current = requestAnimationFrame(animate);
     };
 
     animationRef.current = requestAnimationFrame(animate);
@@ -102,7 +103,7 @@ function SnowEffect({ isActive }: { isActive: boolean }) {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 pointer-events-none z-50"
-      style={{ background: 'transparent', willChange: 'transform' }}
+      style={{ background: 'transparent' }}
     />
   );
 }
