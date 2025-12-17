@@ -5,12 +5,11 @@ import { useAppContext } from "@/lib/appContext";
 import { t } from "@/lib/translations";
 import { Button } from "@/components/ui/button";
 
-// Snow effect component with real snowflake shapes
+// Snow effect component - simple elegant dots like Google AI Studio
 function SnowEffect({ isActive }: { isActive: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const snowflakesRef = useRef<Array<{x: number; y: number; size: number; speed: number; opacity: number; swing: number; swingSpeed: number; rotation: number; rotationSpeed: number}>>([]);
+  const snowflakesRef = useRef<Array<{x: number; y: number; size: number; speed: number; opacity: number}>>([]);
   const animationRef = useRef<number>();
-  const lastTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isActive) {
@@ -25,7 +24,7 @@ function SnowEffect({ isActive }: { isActive: boolean }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d', { alpha: true });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const resizeCanvas = () => {
@@ -35,111 +34,46 @@ function SnowEffect({ isActive }: { isActive: boolean }) {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Initialize snowflakes with varied sizes
-    const isMobile = window.innerWidth < 768;
-    const snowCount = isMobile ? 50 : 100;
+    // Initialize snowflakes - small elegant dots spread across screen
+    const snowCount = 80;
     snowflakesRef.current = [];
     for (let i = 0; i < snowCount; i++) {
       snowflakesRef.current.push({
         x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height - canvas.height,
-        size: Math.random() * 8 + 4,
-        speed: Math.random() * 1.5 + 0.5,
-        opacity: Math.random() * 0.6 + 0.4,
-        swing: Math.random() * Math.PI * 2,
-        swingSpeed: Math.random() * 0.015 + 0.005,
-        rotation: Math.random() * Math.PI * 2,
-        rotationSpeed: (Math.random() - 0.5) * 0.02,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2 + 1,
+        speed: Math.random() * 0.3 + 0.1,
+        opacity: Math.random() * 0.5 + 0.3,
       });
     }
 
-    // Draw a beautiful snowflake shape
-    const drawSnowflake = (x: number, y: number, size: number, rotation: number, opacity: number) => {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rotation);
-      ctx.globalAlpha = opacity;
-      
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = size / 6;
-      ctx.lineCap = 'round';
-      
-      // Draw 6 branches
-      for (let i = 0; i < 6; i++) {
-        ctx.save();
-        ctx.rotate((Math.PI / 3) * i);
-        
-        // Main branch
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(0, -size);
-        ctx.stroke();
-        
-        // Small side branches
-        const branchLength = size * 0.4;
-        const branchPos = size * 0.6;
-        
-        ctx.beginPath();
-        ctx.moveTo(0, -branchPos);
-        ctx.lineTo(-branchLength * 0.5, -branchPos - branchLength * 0.5);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.moveTo(0, -branchPos);
-        ctx.lineTo(branchLength * 0.5, -branchPos - branchLength * 0.5);
-        ctx.stroke();
-        
-        ctx.restore();
-      }
-      
-      // Center dot
-      ctx.beginPath();
-      ctx.arc(0, 0, size / 8, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      
-      ctx.restore();
-    };
-
-    const animate = (currentTime: number) => {
-      // Limit to 60fps for consistent speed
-      const deltaTime = currentTime - lastTimeRef.current;
-      if (deltaTime < 16) {
-        animationRef.current = requestAnimationFrame(animate);
-        return;
-      }
-      lastTimeRef.current = currentTime;
-
+    const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       snowflakesRef.current.forEach((flake) => {
-        // Smooth movement
         flake.y += flake.speed;
-        flake.swing += flake.swingSpeed;
-        flake.x += Math.sin(flake.swing) * 0.8;
-        flake.rotation += flake.rotationSpeed;
 
-        // Reset when off screen
-        if (flake.y > canvas.height + 20) {
-          flake.y = -20;
+        if (flake.y > canvas.height) {
+          flake.y = 0;
           flake.x = Math.random() * canvas.width;
         }
-        if (flake.x > canvas.width + 20) flake.x = -20;
-        if (flake.x < -20) flake.x = canvas.width + 20;
 
-        drawSnowflake(flake.x, flake.y, flake.size, flake.rotation, flake.opacity);
+        // Simple dot
+        ctx.beginPath();
+        ctx.arc(flake.x, flake.y, flake.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${flake.opacity})`;
+        ctx.fill();
       });
 
       animationRef.current = requestAnimationFrame(animate);
     };
 
-    animationRef.current = requestAnimationFrame(animate);
+    animate();
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
-        animationRef.current = undefined;
       }
     };
   }, [isActive]);
