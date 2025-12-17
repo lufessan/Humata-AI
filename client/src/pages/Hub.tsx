@@ -5,106 +5,59 @@ import { useAppContext } from "@/lib/appContext";
 import { t } from "@/lib/translations";
 import { Button } from "@/components/ui/button";
 
-// Snow effect component - optimized for smooth consistent speed
+// Snow effect component - using CSS animations for smooth performance
 function SnowEffect({ isActive }: { isActive: boolean }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const snowflakesRef = useRef<Array<{x: number; y: number; size: number; speed: number; opacity: number; drift: number}>>([]);
-  const animationRef = useRef<number>();
-  const lastTimeRef = useRef<number>(0);
+  const [snowflakes, setSnowflakes] = useState<Array<{id: number; left: number; delay: number; duration: number; size: number; opacity: number}>>([]);
 
   useEffect(() => {
     if (!isActive) {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = undefined;
-      }
-      snowflakesRef.current = [];
-      lastTimeRef.current = 0;
+      setSnowflakes([]);
       return;
     }
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d', { alpha: true });
-    if (!ctx) return;
-
-    const isMobile = window.innerWidth < 768;
-    let width = window.innerWidth;
-    let height = window.innerHeight;
-    
-    const resizeCanvas = () => {
-      width = window.innerWidth;
-      height = window.innerHeight;
-      canvas.width = width;
-      canvas.height = height;
-    };
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    // Reduce particles on mobile for better performance
-    const snowCount = isMobile ? 35 : 50;
-    snowflakesRef.current = [];
-    
-    for (let i = 0; i < snowCount; i++) {
-      snowflakesRef.current.push({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        size: Math.random() * 3 + 2,
-        speed: Math.random() * 150 + 100,
-        opacity: Math.random() * 0.6 + 0.4,
-        drift: Math.random() * 30 - 15,
+    const count = 100;
+    const flakes = [];
+    for (let i = 0; i < count; i++) {
+      flakes.push({
+        id: i,
+        left: Math.random() * 100,
+        delay: Math.random() * 3,
+        duration: Math.random() * 2 + 2,
+        size: Math.random() * 4 + 3,
+        opacity: Math.random() * 0.5 + 0.5,
       });
     }
-
-    const animate = (currentTime: number) => {
-      if (lastTimeRef.current === 0) {
-        lastTimeRef.current = currentTime;
-      }
-      
-      const deltaTime = (currentTime - lastTimeRef.current) / 1000;
-      lastTimeRef.current = currentTime;
-
-      ctx.clearRect(0, 0, width, height);
-
-      snowflakesRef.current.forEach((flake) => {
-        flake.y += flake.speed * deltaTime;
-        flake.x += flake.drift * deltaTime;
-
-        if (flake.y > height) {
-          flake.y = -10;
-          flake.x = Math.random() * width;
-        }
-        if (flake.x > width) flake.x = 0;
-        if (flake.x < 0) flake.x = width;
-
-        ctx.beginPath();
-        ctx.arc(flake.x, flake.y, flake.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${flake.opacity})`;
-        ctx.fill();
-      });
-
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
+    setSnowflakes(flakes);
   }, [isActive]);
 
   if (!isActive) return null;
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-50"
-      style={{ background: 'transparent' }}
-    />
+    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+      <style>{`
+        @keyframes snowfall {
+          0% { transform: translateY(-10px) translateX(0); }
+          50% { transform: translateY(50vh) translateX(10px); }
+          100% { transform: translateY(100vh) translateX(-5px); }
+        }
+      `}</style>
+      {snowflakes.map((flake) => (
+        <div
+          key={flake.id}
+          style={{
+            position: 'absolute',
+            left: `${flake.left}%`,
+            top: '-10px',
+            width: `${flake.size}px`,
+            height: `${flake.size}px`,
+            backgroundColor: `rgba(255, 255, 255, ${flake.opacity})`,
+            borderRadius: '50%',
+            animation: `snowfall ${flake.duration}s linear ${flake.delay}s infinite`,
+            boxShadow: '0 0 3px rgba(255, 255, 255, 0.5)',
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
