@@ -42,5 +42,5 @@ args = "npm run dev"
 waitForPort = 5000
 
 [agent]
-integrations = ["javascript_gemini:1.0.0"]
+integrations = ["javascript_gemini:1.0.0", "javascript_gemini_ai_integrations:2.0.0"]
 expertMode = true
